@@ -67,6 +67,8 @@ let db = {
   }
 };
 const INGREDIENTS_PER_PAGE = 7;
+const DASHBOARD_RECIPES_PER_PAGE = 10;
+let dashCurrentPage = 1;
 let ingCurrentPage = 1;
 let editingRecipeId = null;
 let editingIngId = null;
@@ -940,21 +942,51 @@ function renderDashboard() {
     </div>`;
   }).join('') : '<div class="text-muted text-sm">No recipes yet</div>';
   // Summary table
+  const search = (document.getElementById('dash-search')?.value || '').toLowerCase().trim();
+  const filtered = costs.filter(x => {
+    if (!search) return true;
+    return x.r.name.toLowerCase().includes(search) || (x.r.category||'').toLowerCase().includes(search);
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / DASHBOARD_RECIPES_PER_PAGE));
+  if (dashCurrentPage > totalPages) dashCurrentPage = totalPages;
+  const beginIndex = (dashCurrentPage - 1) * DASHBOARD_RECIPES_PER_PAGE;
+  const pageItems = filtered.slice(beginIndex, beginIndex + DASHBOARD_RECIPES_PER_PAGE);
   const tbody = document.getElementById('dash-table-body');
-  tbody.innerHTML = costs.length ? costs.map(x => {
-    const sClass = x.margin>=tgt?'tag-green':x.margin>=tgt*0.6?'tag-amber':'tag-red';
-    return `<tr>
-      <td class="td-name">${x.r.name}</td>
-      <td><span class="tag tag-blue">${x.r.category||'—'}</span></td>
-      <td>${x.r.batch} ${x.r.unit||'pcs'}</td>
-      <td class="td-mono">${cur(x.c.ingCost)}</td>
-      <td class="td-mono">${cur(x.c.pkgCost)}</td>
-      <td class="td-mono" style="font-weight:600">${cur(x.c.total)}</td>
-      <td class="td-mono" style="color:var(--accent)">${cur(x.sell)}</td>
-      <td><span class="tag ${sClass}">${x.margin.toFixed(1)}%</span></td>
-      <td><span class="tag ${sClass}">${x.margin>=tgt?'✓ Target Met':'✗ Below Target'}</span></td>
-    </tr>`;
-  }).join('') : `<tr><td colspan="9"><div class="empty-state" style="padding:40px"><h3>No recipes added yet</h3><p>Add your first recipe to see the dashboard</p></div></td></tr>`;
+  if (!pageItems.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state" style="padding:40px"><h3>No recipes match your search</h3><p>Try a different term or clear the search box.</p></div></td></tr>`;
+  } else {
+    tbody.innerHTML = pageItems.map(x => {
+      const sClass = x.margin>=tgt?'tag-green':x.margin>=tgt*0.6?'tag-amber':'tag-red';
+      return `<tr>
+        <td class="td-name">${x.r.name}</td>
+        <td><span class="tag tag-blue">${x.r.category||'—'}</span></td>
+        <td>${x.r.batch} ${x.r.unit||'pcs'}</td>
+        <td class="td-mono">${cur(x.c.ingCost)}</td>
+        <td class="td-mono">${cur(x.c.pkgCost)}</td>
+        <td class="td-mono" style="font-weight:600">${cur(x.c.total)}</td>
+        <td class="td-mono" style="color:var(--accent)">${cur(x.sell)}</td>
+        <td><span class="tag ${sClass}">${x.margin.toFixed(1)}%</span></td>
+        <td><span class="tag ${sClass}">${x.margin>=tgt?'✓ Target Met':'✗ Below Target'}</span></td>
+      </tr>`;
+    }).join('');
+  }
+  const pagination = document.getElementById('dash-pagination');
+  if (pagination) {
+    if (filtered.length <= DASHBOARD_RECIPES_PER_PAGE) {
+      pagination.innerHTML = `<div class="page-info">Showing ${filtered.length} of ${filtered.length} recipes</div>`;
+    } else {
+      pagination.innerHTML = `
+        <button class="page-btn" ${dashCurrentPage === 1 ? 'disabled' : ''} onclick="setDashPage(${dashCurrentPage - 1})">&lt; Prev</button>
+        <div class="page-info">Page ${dashCurrentPage} of ${totalPages}</div>
+        <button class="page-btn" ${dashCurrentPage === totalPages ? 'disabled' : ''} onclick="setDashPage(${dashCurrentPage + 1})">Next &gt;</button>
+      `;
+    }
+  }
+}
+
+function setDashPage(page) {
+  dashCurrentPage = Math.max(1, page);
+  renderDashboard();
 }
 
 // ===== INGREDIENTS =====
