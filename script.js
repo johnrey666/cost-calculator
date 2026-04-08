@@ -71,6 +71,7 @@ const DASHBOARD_RECIPES_PER_PAGE = 10;
 let dashCurrentPage = 1;
 let ingCurrentPage = 1;
 let editingRecipeId = null;
+let viewingRecipeId = null;
 let editingIngId = null;
 let editingPkgId = null;
 let editingCnPackageId = null;
@@ -301,24 +302,26 @@ function cur(n) { return (db.settings.currency || '₱') + parseFloat(n||0).toFi
 function calcRecipeCosts(recipe) {
   const ingCost = (recipe.ingredients||[]).reduce((s,r) => s + calcIngredientCost(r.qty, r.unit, r.name), 0);
   const pkgCost = (recipe.packaging||[]).reduce((s,r) => s + (parseFloat(r.qty)||0)*(parseFloat(r.costPerUnit)||0), 0);
-  const total = ingCost + pkgCost;
-  return { ingCost, pkgCost, total };
+  const baseCost = ingCost + pkgCost;
+  const vatCost = recipe.includeVat ? baseCost * 0.12 : 0;
+  const total = baseCost + vatCost;
+  return { ingCost, pkgCost, baseCost, vatCost, total };
 }
 function calcSellPrice(recipe) {
-  const { total } = calcRecipeCosts(recipe);
+  const { baseCost } = calcRecipeCosts(recipe);
   if (recipe.sellPrice) return parseFloat(recipe.sellPrice);
   const method = recipe.pricingMethod || db.settings.pricingMethod || 'markup';
   const val = parseFloat(recipe.pricingValue || 30);
-  if (method === 'markup') return total * (1 + val/100);
-  if (method === 'margin') return total / (1 - val/100);
-  if (method === 'multiplier') return total * val;
-  return total * 1.3;
+  if (method === 'markup') return baseCost * (1 + val/100);
+  if (method === 'margin') return baseCost / (1 - val/100);
+  if (method === 'multiplier') return baseCost * val;
+  return baseCost * 1.3;
 }
 function calcMargin(recipe) {
-  const { total } = calcRecipeCosts(recipe);
+  const { baseCost } = calcRecipeCosts(recipe);
   const sell = calcSellPrice(recipe);
   if (!sell) return 0;
-  return ((sell - total) / sell) * 100;
+  return ((sell - baseCost) / sell) * 100;
 }
 
 // ===== RECIPE MODAL =====
@@ -338,6 +341,8 @@ function resetRecipeModal() {
   if (pricingValueEl) pricingValueEl.value = db.settings.markup || 30;
   const pricingMethodEl = document.getElementById('r-pricing-method');
   if (pricingMethodEl) pricingMethodEl.value = db.settings.pricingMethod || 'markup';
+  const vatCheckbox = document.getElementById('r-include-vat');
+  if (vatCheckbox) vatCheckbox.checked = false;
   document.getElementById('recipe-ing-rows').innerHTML = '';
   document.getElementById('recipe-pkg-rows').innerHTML = '';
   updateRecipeCostPreview();
@@ -593,7 +598,10 @@ function updateRecipeCostPreview() {
   
   const ingCost = ingRows.reduce((s,r) => s + calcIngredientCost(r.qty, r.unit, r.name), 0);
   const pkgCost = pkgRows.reduce((s,r) => s + r.qty*r.costPerUnit, 0);
-  const total = ingCost + pkgCost;
+  const baseTotal = ingCost + pkgCost;
+  const includeVat = document.getElementById('r-include-vat')?.checked;
+  const vatCost = includeVat ? baseTotal * 0.12 : 0;
+  const total = baseTotal + vatCost;
   
   // Pricing
   const method = document.getElementById('r-pricing-method').value;
@@ -601,13 +609,15 @@ function updateRecipeCostPreview() {
   const manualPrice = parseFloat(document.getElementById('r-sell-price').value)||0;
   let sellPrice = manualPrice || 0;
   if (!sellPrice) {
-    if (method === 'markup') sellPrice = total * (1 + pval/100);
-    else if (method === 'margin') sellPrice = total > 0 ? total / (1 - pval/100) : 0;
-    else if (method === 'multiplier') sellPrice = total * pval;
+    if (method === 'markup') sellPrice = baseTotal * (1 + pval/100);
+    else if (method === 'margin') sellPrice = baseTotal > 0 ? baseTotal / (1 - pval/100) : 0;
+    else if (method === 'multiplier') sellPrice = baseTotal * pval;
   }
-  const margin = sellPrice > 0 ? ((sellPrice - total) / sellPrice * 100) : 0;
+  const margin = sellPrice > 0 ? ((sellPrice - baseTotal) / sellPrice * 100) : 0;
   document.getElementById('prev-ing').textContent = cur(ingCost);
   document.getElementById('prev-pkg').textContent = cur(pkgCost);
+  document.getElementById('prev-vat').textContent = cur(vatCost);
+  document.getElementById('prev-vat-row').style.display = includeVat ? 'flex' : 'none';
   document.getElementById('prev-total').textContent = cur(total);
   document.getElementById('prev-price').textContent = cur(sellPrice);
   document.getElementById('prev-margin').textContent = margin.toFixed(1) + '%';
@@ -672,6 +682,7 @@ async function saveRecipe() {
     notes: document.getElementById('r-notes').value.trim(),
     ingredients: ingredients,
     packaging: packaging,
+    includeVat: document.getElementById('r-include-vat')?.checked || false,
     pricingMethod: document.getElementById('r-pricing-method').value,
     pricingValue: parseFloat(document.getElementById('r-pricing-value').value)||0,
     sellPrice: parseFloat(document.getElementById('r-sell-price').value)||0,
@@ -721,6 +732,8 @@ function editRecipe(id) {
   document.getElementById('r-pricing-method').value = r.pricingMethod||'markup';
   document.getElementById('r-pricing-value').value = r.pricingValue||30;
   document.getElementById('r-sell-price').value = r.sellPrice||'';
+  const vatCheckbox = document.getElementById('r-include-vat');
+  if (vatCheckbox) vatCheckbox.checked = !!r.includeVat;
   document.getElementById('recipe-ing-rows').innerHTML = '';
   document.getElementById('recipe-pkg-rows').innerHTML = '';
   (r.ingredients||[]).forEach(i => addIngredientRow(i));
@@ -735,19 +748,32 @@ function deleteRecipe(id) {
   toast('Recipe deleted.', 'red');
 }
 function viewRecipe(id) {
+  viewingRecipeId = id;
   const r = db.recipes.find(x => x.id === id);
   if (!r) return;
-  const { ingCost, pkgCost, opexCost, laborCost, total } = calcRecipeCosts(r);
-  const sell = calcSellPrice(r);
-  const margin = calcMargin(r);
-  const tgt = db.settings.targetMargin || 30;
-  const statusColor = margin >= tgt ? 'tag-green' : margin >= tgt*0.6 ? 'tag-amber' : 'tag-red';
   document.getElementById('view-recipe-title').textContent = r.name;
   document.getElementById('view-recipe-body').innerHTML = `
-    <div class="flex-row mb-4">
+    <div class="flex-row mb-4" style="gap:16px;flex-wrap:wrap;align-items:center;">
       <span class="tag tag-blue">${r.category||'Uncategorized'}</span>
       <span class="text-sm text-muted">Batch: ${r.batch} ${r.unit||'pcs'}</span>
     </div>
+    <div id="view-recipe-details"></div>
+  `;
+  renderViewRecipeModal();
+  showModal('view-recipe-modal');
+}
+
+function renderViewRecipeModal() {
+  if (!viewingRecipeId) return;
+  const r = db.recipes.find(x => x.id === viewingRecipeId);
+  if (!r) return;
+  const { ingCost, pkgCost, opexCost, laborCost, total, vatCost } = calcRecipeCosts(r);
+  const sell = calcSellPrice(r);
+  const profit = sell - (r.includeVat ? total - vatCost : total);
+  const margin = calcMargin(r);
+  const tgt = db.settings.targetMargin || 30;
+  const statusColor = margin >= tgt ? 'tag-green' : margin >= tgt*0.6 ? 'tag-amber' : 'tag-red';
+  document.getElementById('view-recipe-details').innerHTML = `
     <div class="section-divider">Ingredients</div>
     ${(r.ingredients||[]).map(i => `<div class="view-ingredient-row"><span>${i.name} × ${i.qty} ${i.unit}</span><span class="td-mono">${cur(calcIngredientCost(i.qty, i.unit, i.name))}</span></div>`).join('')}
     <div class="section-divider">Packaging</div>
@@ -757,15 +783,15 @@ function viewRecipe(id) {
       <div class="cost-row"><span class="cost-label">Packaging Cost</span><span class="cost-val">${cur(pkgCost)}</span></div>
       <div class="cost-row"><span class="cost-label">OPEX</span><span class="cost-val">${cur(opexCost)}</span></div>
       <div class="cost-row"><span class="cost-label">Labor</span><span class="cost-val">${cur(laborCost)}</span></div>
+      ${r.includeVat ? `<div class="cost-row"><span class="cost-label">VAT Expense (12%)</span><span class="cost-val">${cur(vatCost)}</span></div>` : ''}
       <div class="cost-row total"><span class="cost-label">Total Cost</span><span class="cost-val">${cur(total)}</span></div>
       <div class="cost-row total"><span class="cost-label">Sell Price</span><span class="cost-val">${cur(sell)}</span></div>
-      <div class="cost-row total"><span class="cost-label">Gross Profit</span><span class="cost-val">${cur(sell-total)}</span></div>
+      <div class="cost-row total"><span class="cost-label">Gross Profit</span><span class="cost-val">${cur(profit)}</span></div>
       <div class="cost-row total"><span class="cost-label">Margin</span><span class="cost-val ${statusColor}" style="padding:2px 8px;border-radius:20px">${margin.toFixed(1)}%</span></div>
       <div class="margin-meter mt-2"><div class="meter-track"><div class="meter-fill" style="width:${Math.min(100,Math.max(0,margin))}%;background:${margin>=tgt?'var(--accent)':margin>=tgt*0.6?'var(--amber)':'var(--red)'}"></div></div></div>
     </div>
     ${r.notes ? `<div class="mt-4 text-sm text-muted">${r.notes}</div>` : ''}
   `;
-  showModal('view-recipe-modal');
 }
 
 // ===== VIEW CN PACKAGE =====
