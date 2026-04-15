@@ -1715,7 +1715,8 @@ function copyCnPackage(id) {
     { id: 'cn-pkg-event-date', value: pkg.eventDate ?? '' },
     { id: 'cn-pkg-event-time', value: pkg.eventTime ?? '' }
   ];
-  
+
+
   fields.forEach(({ id, value }) => {
     const el = document.getElementById(id);
     if (el) el.value = value;

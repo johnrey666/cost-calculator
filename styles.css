@@ -250,7 +250,7 @@
   .flex-between { display: flex; align-items: center; justify-content: space-between; }
   .mt-4 { margin-top: 16px; }
   .mt-2 { margin-top: 8px; }
-  .mb-4 { margin-bottom: 16px; }
+  .mb-4 { margin-bottom: 16px; } 
   .text-sm { font-size: 12px; }
   .text-xs { font-size: 11px; }
   .text-muted { color: var(--text3); }
