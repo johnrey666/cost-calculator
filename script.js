@@ -979,7 +979,7 @@ function renderDashboard() {
   const pageItems = filtered.slice(beginIndex, beginIndex + DASHBOARD_RECIPES_PER_PAGE);
   const tbody = document.getElementById('dash-table-body');
   if (!pageItems.length) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state" style="padding:40px"><h3>No recipes match your search</h3><p>Try a different term or clear the search box.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state" style="padding:40px"><h3>No recipes match your search</h3><p>Try a different term or clear the search box.</p></div></td></table>`;
   } else {
     tbody.innerHTML = pageItems.map(x => {
       const sClass = x.margin>=tgt?'tag-green':x.margin>=tgt*0.6?'tag-amber':'tag-red';
@@ -1171,7 +1171,7 @@ function deletePackaging(id) {
 }
 function renderPackaging() {
   const tbody = document.getElementById('pkg-table-body');
-  if (!db.packaging.length) { tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state"><h3>No packaging yet</h3><p>Add packaging materials used in your recipes</p></div></td></tr>`; return; }
+  if (!db.packaging.length) { tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state"><h3>No packaging yet</h3><p>Add packaging materials used in your recipes</p></div><td></tr>`; return; }
   tbody.innerHTML = db.packaging.map(p => `<tr>
     <td>${p.sku?`${p.sku} — `:''}<span class="td-name">${p.name}</span></td>
     <td><span class="tag tag-purple">${p.type||'—'}</span></td>
@@ -1255,7 +1255,7 @@ function renderOpex() {
 function renderPricing() {
   const tgt = db.settings.targetMargin || 30;
   const tbody = document.getElementById('pricing-table-body');
-  if (!db.recipes.length) { tbody.innerHTML=`<tr><td colspan="13"><div class="empty-state"><h3>No recipes</h3></div></td></tr>`; return; }
+  if (!db.recipes.length) { tbody.innerHTML=`<tr><td colspan="13"><div class="empty-state"><h3>No recipes</h3></div></table></tr>`; return; }
   tbody.innerHTML = db.recipes.map((r,i) => {
     const c = calcRecipeCosts(r);
     const sell = calcSellPrice(r);
@@ -1716,7 +1716,6 @@ function copyCnPackage(id) {
     { id: 'cn-pkg-event-time', value: pkg.eventTime ?? '' }
   ];
 
-
   fields.forEach(({ id, value }) => {
     const el = document.getElementById(id);
     if (el) el.value = value;
@@ -1786,7 +1785,6 @@ function renderCnPackages() {
   }).join('');
 }
 
-// ===== SEED DATA =====
 // ===== UI EVENT LISTENERS & INIT =====
 function performInitialization() {
   // Apply theme early, even before authentication
