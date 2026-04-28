@@ -307,8 +307,6 @@
       </div>
     </div>
 
-
-
     <!-- ===== PRICING REPORT ===== -->
     <div id="page-pricing" class="page">
       <div class="topbar">
@@ -356,6 +354,10 @@
       <div class="topbar">
         <div class="topbar-title">CN Package</div>
         <div class="topbar-actions">
+          <button class="btn btn-ghost" onclick="showDefaultTemplates()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+            Default Templates
+          </button>
           <button class="btn btn-primary" onclick="showModal('cn-package-modal')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             New Package
@@ -363,25 +365,20 @@
         </div>
       </div>
       <div style="padding:24px 28px">
-        <div class="card">
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Package Name</th>
-                  <th>Recipes</th>
-                  <th>Pax</th>
-                  <th>Total Cost</th>
-                  <th>Selling Price</th>
-                  <th>Profit</th>
-                  <th>Margin</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="cn-package-table-body"></tbody>
-            </table>
+        <!-- Filter bar -->
+        <div class="toolbar" style="margin-bottom:20px">
+          <div class="search-box">
+            <span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+            <input type="text" placeholder="Search packages..." id="cn-search" oninput="renderCnPackages()">
           </div>
+          <select class="filter-select" id="cn-filter-type" onchange="renderCnPackages()">
+            <option value="">All Types</option>
+            <option value="custom">Custom</option>
+            <option value="template">Templates</option>
+          </select>
         </div>
+        <!-- Cards grid -->
+        <div class="pkg-cards-grid" id="cn-package-cards"></div>
       </div>
     </div>
 
@@ -667,25 +664,51 @@
   </div>
 </div>
 
-
-
-<!-- CN PACKAGE MODAL -->
+<!-- CN PACKAGE MODAL (Create/Edit) -->
 <div class="modal-overlay" id="cn-package-modal">
-  <div class="modal" style="max-width:800px">
+  <div class="modal" style="max-width:860px">
     <div class="modal-header">
       <div class="modal-title" id="cn-package-modal-title">New Package</div>
       <button class="modal-close" onclick="closeModal('cn-package-modal')">✕</button>
     </div>
     <div class="modal-body">
-      <div class="form-grid">
-        <div class="form-group span2">
-          <label>Package Name *</label>
-          <input type="text" id="cn-pkg-name" placeholder="e.g. Wedding Package A">
+      <!-- Cover Image & Basic Info -->
+      <div style="display:grid;grid-template-columns:200px 1fr;gap:20px;margin-bottom:16px;align-items:start">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px">Cover Image</label>
+          <div class="pkg-img-upload" id="pkg-img-upload-area" onclick="triggerImageUpload()">
+            <img id="pkg-img-preview" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:8px">
+            <div id="pkg-img-placeholder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;color:var(--text3);margin:0 auto 8px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <div style="font-size:11px;color:var(--text3)">Click to upload</div>
+              <div style="font-size:10px;color:var(--text3);margin-top:2px">or paste emoji icon</div>
+            </div>
+          </div>
+          <div style="margin-top:8px">
+            <input type="text" id="cn-pkg-emoji" placeholder="🍽️ or emoji icon" style="text-align:center;font-size:20px" oninput="updateEmojiPreview()" maxlength="4">
+          </div>
         </div>
-        <div class="form-group">
-          <label>Number of Pax *</label>
-          <input type="number" id="cn-pkg-pax" value="50" min="1" oninput="updateCnPackageCostPreview()">
+        <div class="form-grid-2">
+          <div class="form-group" style="grid-column:span 2">
+            <label>Package Name *</label>
+            <input type="text" id="cn-pkg-name" placeholder="e.g. Wedding Package A">
+          </div>
+          <div class="form-group" style="grid-column:span 2">
+            <label>Short Description</label>
+            <input type="text" id="cn-pkg-desc" placeholder="e.g. Elegant 5-course dinner for intimate celebrations">
+          </div>
+          <div class="form-group">
+            <label>Package Type / Tag</label>
+            <input type="text" id="cn-pkg-tag" placeholder="e.g. Wedding, Birthday, Corporate">
+          </div>
+          <div class="form-group">
+            <label>Number of Pax *</label>
+            <input type="number" id="cn-pkg-pax" value="50" min="1" oninput="updateCnPackageCostPreview()">
+          </div>
         </div>
+      </div>
+
+      <div class="form-grid" style="margin-bottom:16px">
         <div class="form-group">
           <label>Contingency Cost (%)</label>
           <input type="number" id="cn-pkg-contingency" value="5" step="0.1" min="0" oninput="updateCnPackageCostPreview()">
@@ -739,7 +762,7 @@
         </div>
       </div>
 
-      <div class="section-divider">Recipes</div>
+      <div class="section-divider">Recipes Included</div>
       <div class="table-wrap">
         <table class="ing-table">
           <thead>
@@ -780,6 +803,50 @@
   </div>
 </div>
 
+<!-- DEFAULT TEMPLATES MODAL -->
+<div class="modal-overlay" id="default-templates-modal">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-header">
+      <div class="modal-title">Default Package Templates</div>
+      <button class="modal-close" onclick="closeModal('default-templates-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:20px">Choose a template as a starting point. You can customize all details, recipes, and pricing before saving.</p>
+      <div class="templates-grid" id="templates-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW CN PACKAGE MODAL (Enhanced) -->
+<div class="modal-overlay" id="view-cn-package-modal">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-header" id="view-pkg-header" style="position:relative;padding:0;overflow:hidden;border-radius:var(--radius2) var(--radius2) 0 0;min-height:180px;border-bottom:none">
+      <!-- Hero banner -->
+      <div id="view-pkg-banner" style="width:100%;min-height:180px;display:flex;align-items:flex-end;padding:24px;background:linear-gradient(135deg,var(--surface2),var(--surface3));position:relative">
+        <div id="view-pkg-emoji-large" style="position:absolute;right:28px;top:50%;transform:translateY(-50%);font-size:72px;opacity:0.4"></div>
+        <div style="position:relative;z-index:1">
+          <div id="view-pkg-tag-badge" style="margin-bottom:8px"></div>
+          <div class="modal-title" id="view-cn-package-title" style="font-size:22px;font-weight:700;color:var(--text)">Package Details</div>
+          <div id="view-pkg-desc" style="font-size:13px;color:var(--text2);margin-top:4px"></div>
+        </div>
+        <button class="modal-close" onclick="closeModal('view-cn-package-modal')" style="position:absolute;top:16px;right:16px">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="view-cn-package-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="editCnPackageFromView()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Edit
+      </button>
+      <button class="btn btn-primary" onclick="copyCnPackageFromView()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        Create Copy
+      </button>
+      <button class="btn btn-ghost" onclick="closeModal('view-cn-package-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- VIEW RECIPE MODAL -->
 <div class="modal-overlay" id="view-recipe-modal">
   <div class="modal" style="max-width:620px">
@@ -794,30 +861,16 @@
   </div>
 </div>
 
-<!-- VIEW CN PACKAGE MODAL -->
-<div class="modal-overlay" id="view-cn-package-modal">
-  <div class="modal" style="max-width:800px">
-    <div class="modal-header">
-      <div class="modal-title" id="view-cn-package-title">Package Details</div>
-      <button class="modal-close" onclick="closeModal('view-cn-package-modal')">✕</button>
-    </div>
-    <div class="modal-body" id="view-cn-package-body"></div>
-    <div class="modal-footer">
-      <button class="btn btn-primary" onclick="copyCnPackageFromView()">Create Copy</button>
-      <button class="btn btn-ghost" onclick="closeModal('view-cn-package-modal')">Close</button>
-    </div>
-  </div>
-</div>
-
 <!-- TOAST -->
 <div class="toast" id="toast">
   <span class="toast-dot green" id="toast-dot"></span>
   <span id="toast-msg">Saved!</span>
 </div>
 
-<!-- HIDDEN FILE INPUT -->
+<!-- HIDDEN FILE INPUTS -->
 <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
 <input type="file" id="ingredient-xlsx-file" accept=".xlsx,.xls" style="display:none" onchange="handleIngredientUpload(event)">
+<input type="file" id="pkg-image-upload" accept="image/*" style="display:none" onchange="handlePkgImageUpload(event)">
 <datalist id="recipe-ingredient-list"></datalist>
 <datalist id="recipe-packaging-list"></datalist>
 
