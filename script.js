@@ -1126,8 +1126,9 @@ function calcCnPackageTotals(pkg) {
   const productionCost = baseCost * ((pkg.productionPct || 0) / 100);
   const capexCost = baseCost * ((pkg.capexPct || 0) / 100);
   const venueCost = pkg.venueCost || 0;
-  const otherExpenses = pkg.otherExpenses || 0;
-  const totalCost = baseCost + contingencyCost + wasteCost + productionCost + capexCost + venueCost + otherExpenses;
+  const manpowerCost = (pkg.manpowerCount || 0) * (pkg.manpowerHours || 0) * (455 / 8);
+  const otherExpenses = Array.isArray(pkg.otherExpenses) ? pkg.otherExpenses.reduce((sum, exp) => sum + (exp.cost || 0), 0) : (pkg.otherExpenses || 0);
+  const totalCost = baseCost + contingencyCost + wasteCost + productionCost + capexCost + venueCost + manpowerCost + otherExpenses;
   const pricingMethod = pkg.pricingMethod || 'markup';
   const pricingValue = pkg.pricingValue ?? 30;
   let sellingPriceExclVat;
@@ -1151,13 +1152,15 @@ function resetCnPackageModal() {
     { id: 'cn-pkg-contingency', value: 5 }, { id: 'cn-pkg-waste', value: 3 },
     { id: 'cn-pkg-production', value: 10 }, { id: 'cn-pkg-capex', value: 30 },
     { id: 'cn-pkg-venue', value: '' }, { id: 'cn-pkg-venue-cost', value: 0 },
-    { id: 'cn-pkg-other-expenses', value: 0 }, { id: 'cn-pkg-event-date', value: '' },
-    { id: 'cn-pkg-event-time', value: '' }, { id: 'cn-pkg-vat', value: 12 },
-    { id: 'cn-pkg-pricing-value', value: 30 }
+    { id: 'cn-pkg-manpower-count', value: 0 }, { id: 'cn-pkg-manpower-hours', value: 0 },
+    { id: 'cn-pkg-event-date', value: '' }, { id: 'cn-pkg-event-time', value: '' },
+    { id: 'cn-pkg-vat', value: 12 }, { id: 'cn-pkg-pricing-value', value: 30 }
   ];
   fields.forEach(({ id, value }) => { const el = document.getElementById(id); if (el) el.value = value; });
   const recipeRowsEl = document.getElementById('cn-package-recipe-rows');
   if (recipeRowsEl) recipeRowsEl.innerHTML = '';
+  const otherExpensesEl = document.getElementById('cn-other-expenses-list');
+  if (otherExpensesEl) otherExpensesEl.innerHTML = '';
   // Reset image
   currentPkgImageData = null;
   const img = document.getElementById('pkg-img-preview');
@@ -1190,6 +1193,21 @@ function addCnPackageRecipeRow(data) {
   }
 }
 
+function addOtherExpenseRow(data) {
+  const container = document.getElementById('cn-other-expenses-list');
+  const row = document.createElement('div');
+  row.style.display = 'flex';
+  row.style.gap = '8px';
+  row.style.marginBottom = '8px';
+  row.style.alignItems = 'center';
+  row.innerHTML = `
+    <input type="text" placeholder="Expense on" value="${data ? data.description : ''}" oninput="updateCnPackageCostPreview()" style="flex:1">
+    <input type="number" placeholder="Cost" value="${data ? data.cost : ''}" step="0.01" min="0" oninput="updateCnPackageCostPreview()" style="width:120px">
+    <button class="remove-row" onclick="this.closest('div').remove();updateCnPackageCostPreview()" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px">✕</button>`;
+  container.appendChild(row);
+  updateCnPackageCostPreview();
+}
+
 function fillCnPackageRecipeCost(sel) {
   const row = sel.closest('tr');
   const recipe = db.recipes.find(r => r.name === sel.value);
@@ -1215,7 +1233,14 @@ function updateCnPackageCostPreview() {
   let pricingValue = parseFloat(document.getElementById('cn-pkg-pricing-value').value);
   if (isNaN(pricingValue)) pricingValue = 30;
   const venueCost = parseFloat(document.getElementById('cn-pkg-venue-cost').value) || 0;
-  const otherExpenses = parseFloat(document.getElementById('cn-pkg-other-expenses').value) || 0;
+  const manpowerCount = parseFloat(document.getElementById('cn-pkg-manpower-count').value) || 0;
+  const manpowerHours = parseFloat(document.getElementById('cn-pkg-manpower-hours').value) || 0;
+  const manpowerCost = manpowerCount * manpowerHours * (455 / 8);
+  let otherExpenses = 0;
+  [...document.getElementById('cn-other-expenses-list').querySelectorAll('.form-grid-2')].forEach(row => {
+    const costInput = row.querySelector('input[type="number"]');
+    otherExpenses += parseFloat(costInput?.value) || 0;
+  });
   let baseCost = 0;
   [...document.getElementById('cn-package-recipe-rows').querySelectorAll('tr')].forEach(row => {
     const qty = parseFloat(row.querySelector('input').value) || 0;
@@ -1228,7 +1253,7 @@ function updateCnPackageCostPreview() {
   const wasteCost = baseCost * (wastePct / 100);
   const productionCost = baseCost * (productionPct / 100);
   const capexCost = baseCost * (capexPct / 100);
-  const totalCost = baseCost + contingencyCost + wasteCost + productionCost + capexCost + venueCost + otherExpenses;
+  const totalCost = baseCost + contingencyCost + wasteCost + productionCost + capexCost + venueCost + otherExpenses + manpowerCost;
   let sellingPriceExclVat;
   if (pricingMethod === 'markup') sellingPriceExclVat = totalCost * (1 + pricingValue / 100);
   else if (pricingMethod === 'margin') sellingPriceExclVat = totalCost > 0 ? totalCost / (1 - pricingValue / 100) : 0;
@@ -1243,6 +1268,7 @@ function updateCnPackageCostPreview() {
   document.getElementById('cn-production-cost').textContent = cur(productionCost);
   document.getElementById('cn-capex-cost').textContent = cur(capexCost);
   document.getElementById('cn-venue-cost').textContent = cur(venueCost);
+  document.getElementById('cn-manpower-cost').textContent = cur(manpowerCost);
   document.getElementById('cn-other-expenses-cost').textContent = cur(otherExpenses);
   document.getElementById('cn-total-cost').textContent = cur(totalCost);
   document.getElementById('cn-vat-cost').textContent = cur(vatAmount);
@@ -1281,7 +1307,12 @@ function saveCnPackage() {
     pricingValue: parseFloat(document.getElementById('cn-pkg-pricing-value')?.value) ?? 30,
     venue: document.getElementById('cn-pkg-venue')?.value?.trim() || '',
     venueCost: parseFloat(document.getElementById('cn-pkg-venue-cost')?.value) || 0,
-    otherExpenses: parseFloat(document.getElementById('cn-pkg-other-expenses')?.value) || 0,
+    manpowerCount: parseFloat(document.getElementById('cn-pkg-manpower-count')?.value) || 0,
+    manpowerHours: parseFloat(document.getElementById('cn-pkg-manpower-hours')?.value) || 0,
+    otherExpenses: [...document.getElementById('cn-other-expenses-list').children].map(row => ({
+      description: row.querySelector('input[type="text"]')?.value?.trim() || '',
+      cost: parseFloat(row.querySelector('input[type="number"]')?.value) || 0
+    })).filter(exp => exp.description || exp.cost > 0),
     eventDate: document.getElementById('cn-pkg-event-date')?.value || '',
     eventTime: document.getElementById('cn-pkg-event-time')?.value || '',
     isCustom: true,
@@ -1317,11 +1348,18 @@ function editCnPackage(id) {
     { id: 'cn-pkg-pricing-value', value: pkg.pricingValue ?? 30 },
     { id: 'cn-pkg-venue', value: pkg.venue ?? '' },
     { id: 'cn-pkg-venue-cost', value: pkg.venueCost ?? 0 },
-    { id: 'cn-pkg-other-expenses', value: pkg.otherExpenses ?? 0 },
+    { id: 'cn-pkg-manpower-count', value: pkg.manpowerCount ?? 0 },
+    { id: 'cn-pkg-manpower-hours', value: pkg.manpowerHours ?? 0 },
     { id: 'cn-pkg-event-date', value: pkg.eventDate ?? '' },
     { id: 'cn-pkg-event-time', value: pkg.eventTime ?? '' }
   ];
   fields.forEach(({ id, value }) => { const el = document.getElementById(id); if (el) el.value = value; });
+  // Populate other expenses
+  const otherExpensesList = document.getElementById('cn-other-expenses-list');
+  otherExpensesList.innerHTML = '';
+  if (pkg.otherExpenses && Array.isArray(pkg.otherExpenses)) {
+    pkg.otherExpenses.forEach(exp => addOtherExpenseRow(exp));
+  }
   // Restore image
   currentPkgImageData = pkg.image || null;
   const img = document.getElementById('pkg-img-preview');
@@ -1435,11 +1473,15 @@ function useTemplate(tplId) {
     { id: 'cn-pkg-pricing-value', value: tpl.pricingValue },
     { id: 'cn-pkg-venue', value: '' },
     { id: 'cn-pkg-venue-cost', value: tpl.venueCost },
-    { id: 'cn-pkg-other-expenses', value: tpl.otherExpenses },
+    { id: 'cn-pkg-manpower-count', value: 0 },
+    { id: 'cn-pkg-manpower-hours', value: 0 },
     { id: 'cn-pkg-event-date', value: '' },
     { id: 'cn-pkg-event-time', value: '' }
   ];
   fields.forEach(({ id, value }) => { const el = document.getElementById(id); if (el) el.value = value; });
+  // Clear other expenses for templates
+  const otherExpensesList = document.getElementById('cn-other-expenses-list');
+  otherExpensesList.innerHTML = '';
   currentPkgImageData = null;
   const img = document.getElementById('pkg-img-preview');
   const placeholder = document.getElementById('pkg-img-placeholder');
@@ -1527,6 +1569,14 @@ function viewCnPackage(id) {
         </div>
       </div>`).join('') : '<div style="color:var(--text3);font-size:13px;padding:12px 0">No recipes added yet</div>'}
 
+    ${(pkg.otherExpenses && Array.isArray(pkg.otherExpenses) && pkg.otherExpenses.length) ? `
+    <div class="section-divider">Other Expenses Breakdown</div>
+    ${pkg.otherExpenses.map(exp => `
+      <div class="view-pkg-recipe-row">
+        <div style="font-weight:500;color:var(--text);font-size:13px">${exp.description || 'Unnamed'}</div>
+        <div class="td-mono" style="color:var(--accent)">${cur(exp.cost || 0)}</div>
+      </div>`).join('')}` : ''}
+
     <div class="section-divider">Cost Breakdown</div>
     <div class="cost-summary" style="margin-top:0">
       <div class="cost-row"><span class="cost-label">Base Recipe Cost</span><span class="cost-val">${cur(t.baseCost)}</span></div>
@@ -1535,6 +1585,7 @@ function viewCnPackage(id) {
       <div class="cost-row"><span class="cost-label">Production (${pkg.productionPct || 0}%)</span><span class="cost-val">${cur(t.productionCost)}</span></div>
       <div class="cost-row"><span class="cost-label">Capex (${pkg.capexPct || 0}%)</span><span class="cost-val">${cur(t.capexCost)}</span></div>
       <div class="cost-row"><span class="cost-label">Venue</span><span class="cost-val">${cur(t.venueCost)}</span></div>
+      <div class="cost-row"><span class="cost-label">Manpower</span><span class="cost-val">${cur((pkg.manpowerCount || 0) * (pkg.manpowerHours || 0) * (455 / 8))}</span></div>
       <div class="cost-row"><span class="cost-label">Other Expenses</span><span class="cost-val">${cur(t.otherExpenses)}</span></div>
       <div class="cost-row total"><span class="cost-label">Total Cost</span><span class="cost-val">${cur(t.totalCost)}</span></div>
       <div class="cost-row"><span class="cost-label">VAT (${pkg.vatPct || 0}%)</span><span class="cost-val">${cur(t.vatAmount)}</span></div>
