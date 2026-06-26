@@ -168,11 +168,32 @@
           </div>
         </div>
 
+        <div class="dash-grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Margin Health</div>
+              <span style="font-size:10.5px;color:var(--text4)">Vs target</span>
+            </div>
+            <div class="card-body">
+              <div class="donut-wrap" id="dash-margin-health"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Cost Composition</div>
+              <span style="font-size:10.5px;color:var(--text4)">All recipes</span>
+            </div>
+            <div class="card-body">
+              <div class="donut-wrap" id="dash-cost-composition"></div>
+            </div>
+          </div>
+        </div>
+
         <div class="dash-grid">
           <div class="card">
             <div class="card-header">
               <div class="card-title">Top Recipes by Cost</div>
-              <span style="font-size:10px;color:var(--text4)">Top 5</span>
+              <span style="font-size:10.5px;color:var(--text4)">Top 8</span>
             </div>
             <div class="card-body">
               <div class="bar-list" id="dash-top-recipes"></div>
@@ -181,7 +202,7 @@
           <div class="card">
             <div class="card-header">
               <div class="card-title">Margin Overview</div>
-              <span style="font-size:10px;color:var(--text4)">By recipe</span>
+              <span style="font-size:10.5px;color:var(--text4)">By recipe</span>
             </div>
             <div class="card-body">
               <div id="dash-margin-list" class="bar-list"></div>
@@ -242,12 +263,12 @@
         <div class="toolbar">
           <div class="search-box">
             <span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-            <input type="text" placeholder="Search recipes..." id="recipe-search" oninput="renderRecipes()">
+            <input type="text" placeholder="Search recipes..." id="recipe-search" oninput="setRecipePage(1)">
           </div>
-          <select class="filter-select" id="recipe-filter-cat" onchange="renderRecipes()">
+          <select class="filter-select" id="recipe-filter-cat" onchange="setRecipePage(1)">
             <option value="">All Categories</option>
           </select>
-          <select class="filter-select" id="recipe-sort" onchange="renderRecipes()">
+          <select class="filter-select" id="recipe-sort" onchange="setRecipePage(1)">
             <option value="name">Sort: Name A–Z</option>
             <option value="cost">Sort: Cost ↑</option>
             <option value="cost-desc">Sort: Cost ↓</option>
@@ -273,6 +294,7 @@
               <tbody id="recipe-table-body"></tbody>
             </table>
           </div>
+          <div class="pagination" id="recipe-pagination"></div>
         </div>
       </div>
     </div>
@@ -403,6 +425,7 @@
                 <tbody id="pricing-table-body"></tbody>
               </table>
             </div>
+            <div class="pagination" id="pricing-pagination"></div>
           </div>
         </div>
       </div>

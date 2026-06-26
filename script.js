@@ -177,10 +177,14 @@ let db = {
     multiplier: 3
   }
 };
-const INGREDIENTS_PER_PAGE = 7;
+const INGREDIENTS_PER_PAGE = 8;
 const DASHBOARD_RECIPES_PER_PAGE = 10;
+const RECIPES_PER_PAGE = 10;
+const PRICING_PER_PAGE = 12;
 let dashCurrentPage = 1;
 let ingCurrentPage = 1;
+let recipeCurrentPage = 1;
+let pricingCurrentPage = 1;
 let editingRecipeId = null;
 let viewingRecipeId = null;
 let editingIngId = null;
@@ -305,19 +309,20 @@ async function load() {
   db.packaging.forEach(p => { if (p.unit) p.unit = p.unit.toLowerCase(); });
   db.recipes.forEach(r => { if (r.unit) r.unit = r.unit.toLowerCase(); });
   const savedTheme = localStorage.getItem('theme') || db.settings.theme;
-  if (savedTheme === 'light') document.body.classList.add('light-theme');
+  if (savedTheme === 'dark') document.body.classList.add('dark-theme');
+  else document.body.classList.remove('dark-theme');
   updateThemeButton();
   updateBadges();
 }
 function toggleTheme() {
-  const isLight = document.body.classList.toggle('light-theme');
-  db.settings.theme = isLight ? 'light' : 'dark';
+  const isDark = document.body.classList.toggle('dark-theme');
+  db.settings.theme = isDark ? 'dark' : 'light';
   localStorage.setItem('theme', db.settings.theme);
   save(); updateThemeButton();
 }
 function updateThemeButton() {
   const btn = document.getElementById('theme-toggle-btn');
-  if (btn) btn.textContent = document.body.classList.contains('light-theme') ? 'Switch to Dark Theme' : 'Switch to Light Theme';
+  if (btn) btn.textContent = document.body.classList.contains('dark-theme') ? 'Switch to Light Theme' : 'Switch to Dark Theme';
 }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
@@ -375,6 +380,76 @@ function showSnackbar(message, type = 'success') {
 
 // ===== CURRENCY =====
 function cur(n) { return (db.settings.currency || '₱') + parseFloat(n || 0).toFixed(2); }
+function compactCur(n) {
+  n = parseFloat(n) || 0;
+  const sym = db.settings.currency || '₱';
+  const abs = Math.abs(n);
+  if (abs >= 1e6) return sym + (n / 1e6).toFixed(1) + 'M';
+  if (abs >= 1e3) return sym + (n / 1e3).toFixed(1) + 'k';
+  return sym + n.toFixed(0);
+}
+
+// ===== SVG DONUT CHART =====
+function renderDonut(containerId, segments, centerVal, centerLabel) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const total = segments.reduce((s, x) => s + (x.value > 0 ? x.value : 0), 0);
+  const size = 124, stroke = 17, r = (size - stroke) / 2, c = 2 * Math.PI * r;
+  let offset = 0, segs = '';
+  if (total > 0) {
+    segments.forEach(s => {
+      if (s.value <= 0) return;
+      const dash = (s.value / total) * c;
+      segs += `<circle class="donut-seg" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke="${s.color}" stroke-width="${stroke}" stroke-dasharray="${dash.toFixed(2)} ${(c - dash).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}"></circle>`;
+      offset += dash;
+    });
+  }
+  const legend = segments.map(s => `
+    <div class="legend-item">
+      <span class="legend-dot" style="background:${s.color}"></span>
+      <span class="legend-label">${s.label}</span>
+      <span class="legend-val">${s.display !== undefined ? s.display : s.value}</span>
+    </div>`).join('');
+  el.innerHTML = `
+    <div class="donut-center-wrap" style="width:${size}px;height:${size}px">
+      <svg class="donut-svg" width="${size}" height="${size}">
+        <circle class="donut-track" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke-width="${stroke}"></circle>
+        ${segs}
+      </svg>
+      <div class="donut-center">
+        <div class="donut-center-val">${centerVal}</div>
+        <div class="donut-center-label">${centerLabel}</div>
+      </div>
+    </div>
+    <div class="donut-legend">${legend}</div>`;
+}
+
+// ===== UNIFIED PAGINATION BUILDER =====
+function buildPagination(current, totalPages, fnName, totalItems, perPage, noun) {
+  noun = noun || 'items';
+  if (totalItems === 0) return `<div class="page-info">No ${noun}</div>`;
+  const start = (current - 1) * perPage + 1;
+  const end = Math.min(current * perPage, totalItems);
+  const info = `<div class="page-info">${start}–${end} of ${totalItems} ${noun}</div>`;
+  if (totalPages <= 1) return info;
+  const pages = [];
+  const add = p => pages.push(p);
+  add(1);
+  let lo = Math.max(2, current - 1), hi = Math.min(totalPages - 1, current + 1);
+  if (lo > 2) add('...');
+  for (let p = lo; p <= hi; p++) add(p);
+  if (hi < totalPages - 1) add('...');
+  if (totalPages > 1) add(totalPages);
+  const numBtns = pages.map(p => p === '...'
+    ? `<span class="page-ellipsis">…</span>`
+    : `<button class="page-btn ${p === current ? 'active' : ''}" onclick="${fnName}(${p})">${p}</button>`).join('');
+  const controls = `<div class="page-controls">
+    <button class="page-btn" ${current === 1 ? 'disabled' : ''} onclick="${fnName}(${current - 1})">‹</button>
+    ${numBtns}
+    <button class="page-btn" ${current === totalPages ? 'disabled' : ''} onclick="${fnName}(${current + 1})">›</button>
+  </div>`;
+  return info + controls;
+}
 
 // ===== RECIPE LOGIC =====
 function calcRecipeCosts(recipe) {
@@ -734,8 +809,17 @@ function renderRecipes() {
     return 0;
   });
   const tbody = document.getElementById('recipe-table-body');
-  if (!list.length) { tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><h3>No recipes yet</h3><p>Click "New Recipe" to add your first recipe</p></div></td></tr>`; return; }
+  const paginationEl = document.getElementById('recipe-pagination');
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><h3>No recipes yet</h3><p>Click "New Recipe" to add your first recipe</p></div></td></tr>`;
+    if (paginationEl) paginationEl.innerHTML = '';
+    return;
+  }
   const tgt = db.settings.targetMargin || 30;
+  const totalPages = Math.max(1, Math.ceil(list.length / RECIPES_PER_PAGE));
+  if (recipeCurrentPage > totalPages) recipeCurrentPage = totalPages;
+  const fullList = list;
+  list = list.slice((recipeCurrentPage - 1) * RECIPES_PER_PAGE, recipeCurrentPage * RECIPES_PER_PAGE);
   tbody.innerHTML = list.map(r => {
     const c = calcRecipeCosts(r);
     const sell = calcSellPrice(r);
@@ -757,7 +841,9 @@ function renderRecipes() {
       </div></td>
     </tr>`;
   }).join('');
+  if (paginationEl) paginationEl.innerHTML = buildPagination(recipeCurrentPage, totalPages, 'setRecipePage', fullList.length, RECIPES_PER_PAGE, 'recipes');
 }
+function setRecipePage(page) { recipeCurrentPage = Math.max(1, page); renderRecipes(); }
 function renderRecipeCategoryFilter() {
   const cats = [...new Set(db.recipes.map(r => r.category).filter(Boolean))];
   const sel = document.getElementById('recipe-filter-cat');
@@ -800,6 +886,27 @@ function renderDashboard() {
       <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, Math.max(0, x.margin)).toFixed(1)}%;background:${color}"></div></div>
       <div class="bar-val" style="color:${color}">${x.margin.toFixed(1)}%</div></div>`;
   }).join('') : '<div class="text-muted text-sm">No recipes yet</div>';
+
+  // ── Donut: Margin Health ──
+  const healthGreen = costs.filter(x => x.margin >= tgt).length;
+  const healthAmber = costs.filter(x => x.margin >= tgt * 0.6 && x.margin < tgt).length;
+  const healthRed = costs.filter(x => x.margin < tgt * 0.6).length;
+  renderDonut('dash-margin-health', [
+    { label: 'On / above target', value: healthGreen, color: 'var(--green)' },
+    { label: 'Near target', value: healthAmber, color: 'var(--amber)' },
+    { label: 'Below target', value: healthRed, color: 'var(--red)' }
+  ], costs.length, costs.length === 1 ? 'Recipe' : 'Recipes');
+
+  // ── Donut: Cost Composition ──
+  const totIng = costs.reduce((s, x) => s + x.c.ingCost, 0);
+  const totPkg = costs.reduce((s, x) => s + x.c.pkgCost, 0);
+  const totVat = costs.reduce((s, x) => s + (x.c.vatCost || 0), 0);
+  renderDonut('dash-cost-composition', [
+    { label: 'Ingredients', value: totIng, color: 'var(--blue)', display: cur(totIng) },
+    { label: 'Packaging', value: totPkg, color: 'var(--purple)', display: cur(totPkg) },
+    { label: 'VAT', value: totVat, color: 'var(--amber)', display: cur(totVat) }
+  ], compactCur(totIng + totPkg + totVat), 'Total');
+
   const search = (document.getElementById('dash-search')?.value || '').toLowerCase().trim();
   const filtered = costs.filter(x => !search || x.r.name.toLowerCase().includes(search) || (x.r.category || '').toLowerCase().includes(search));
   const totalPages = Math.max(1, Math.ceil(filtered.length / DASHBOARD_RECIPES_PER_PAGE));
@@ -824,14 +931,7 @@ function renderDashboard() {
   }
   const pagination = document.getElementById('dash-pagination');
   if (pagination) {
-    if (filtered.length <= DASHBOARD_RECIPES_PER_PAGE) {
-      pagination.innerHTML = `<div class="page-info">Showing ${filtered.length} of ${filtered.length} recipes</div>`;
-    } else {
-      pagination.innerHTML = `
-        <button class="page-btn" ${dashCurrentPage === 1 ? 'disabled' : ''} onclick="setDashPage(${dashCurrentPage - 1})">&lt; Prev</button>
-        <div class="page-info">Page ${dashCurrentPage} of ${totalPages}</div>
-        <button class="page-btn" ${dashCurrentPage === totalPages ? 'disabled' : ''} onclick="setDashPage(${dashCurrentPage + 1})">Next &gt;</button>`;
-    }
+    pagination.innerHTML = buildPagination(dashCurrentPage, totalPages, 'setDashPage', filtered.length, DASHBOARD_RECIPES_PER_PAGE, 'recipes');
   }
 }
 function setDashPage(page) { dashCurrentPage = Math.max(1, page); renderDashboard(); }
@@ -912,12 +1012,10 @@ function renderIngredients() {
       </div></td></tr>`;
   }).join('');
   if (paginationEl) {
-    paginationEl.innerHTML = totalPages > 1 ? `
-      <button class="page-btn" onclick="setIngPage(${Math.max(1, ingCurrentPage - 1)});renderIngredients()" ${ingCurrentPage === 1 ? 'disabled' : ''}>Prev</button>
-      <span class="page-info">Page ${ingCurrentPage} of ${totalPages}</span>
-      <button class="page-btn" onclick="setIngPage(${Math.min(totalPages, ingCurrentPage + 1)});renderIngredients()" ${ingCurrentPage === totalPages ? 'disabled' : ''}>Next</button>` : '';
+    paginationEl.innerHTML = buildPagination(ingCurrentPage, totalPages, 'gotoIngPage', list.length, INGREDIENTS_PER_PAGE, 'ingredients');
   }
 }
+function gotoIngPage(page) { setIngPage(page); renderIngredients(); }
 function renderIngCategoryFilter() {
   const cats = [...new Set(db.ingredients.map(i => i.category).filter(Boolean))];
   const sel = document.getElementById('ing-filter-cat'); if (!sel) return;
@@ -975,11 +1073,22 @@ function renderPackaging() {
 }
 
 // ===== PRICING REPORT =====
+function setPricingPage(page) { pricingCurrentPage = Math.max(1, page); renderPricing(); }
 function renderPricing() {
   const tgt = db.settings.targetMargin || 30;
   const tbody = document.getElementById('pricing-table-body');
-  if (!db.recipes.length) { tbody.innerHTML = `<tr><td colspan="13"><div class="empty-state"><h3>No recipes</h3></div></td></tr>`; return; }
-  tbody.innerHTML = db.recipes.map((r, i) => {
+  const paginationEl = document.getElementById('pricing-pagination');
+  if (!db.recipes.length) {
+    tbody.innerHTML = `<tr><td colspan="13"><div class="empty-state"><h3>No recipes</h3></div></td></tr>`;
+    if (paginationEl) paginationEl.innerHTML = '';
+    return;
+  }
+  const totalPages = Math.max(1, Math.ceil(db.recipes.length / PRICING_PER_PAGE));
+  if (pricingCurrentPage > totalPages) pricingCurrentPage = totalPages;
+  const startIdx = (pricingCurrentPage - 1) * PRICING_PER_PAGE;
+  const pageRecipes = db.recipes.slice(startIdx, startIdx + PRICING_PER_PAGE);
+  tbody.innerHTML = pageRecipes.map((r, idx) => {
+    const i = startIdx + idx;
     const c = calcRecipeCosts(r);
     const sell = calcSellPrice(r);
     const gross = sell - c.total;
@@ -1001,6 +1110,7 @@ function renderPricing() {
       <td><span class="tag ${sClass}">${margin.toFixed(1)}%</span></td>
       <td><span class="tag ${margin >= tgt ? 'tag-green' : 'tag-red'}">${margin >= tgt ? '✓ Yes' : '✗ No'}</span></td></tr>`;
   }).join('');
+  if (paginationEl) paginationEl.innerHTML = buildPagination(pricingCurrentPage, totalPages, 'setPricingPage', db.recipes.length, PRICING_PER_PAGE, 'recipes');
 }
 
 // ===== SETTINGS =====
@@ -1699,7 +1809,7 @@ function performInitialization() {
   if (_initialized) return;
   _initialized = true;
   const savedTheme = localStorage.getItem('theme') || 'light';
-  if (savedTheme === 'light') document.body.classList.add('light-theme');
+  if (savedTheme === 'dark') document.body.classList.add('dark-theme');
   const loginInput = document.getElementById('login-password');
   if (loginInput) loginInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') authenticateLogin(); });
   if (!initializeSession()) { hideMainApp(); return; }
