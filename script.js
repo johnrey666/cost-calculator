@@ -1207,6 +1207,69 @@ function renderRecipeCategoryFilter() {
   sel.innerHTML = '<option value="">All Categories</option>' + allCats.map(c => `<option value="${c}" ${c === cur2 ? 'selected' : ''}>${c}</option>`).join('');
 }
 
+// ===== DASHBOARD INFOGRAPHIC HELPERS =====
+function renderInfographicBar(name, value, pct, color, rank, gradient) {
+  const grad = gradient || `linear-gradient(90deg, ${color}, ${color}88)`;
+  const rankStr = String(rank).padStart(2, '0');
+  return `<div class="infographic-bar-item">
+    <span class="infographic-rank">${rankStr}</span>
+    <div class="infographic-bar-content">
+      <div class="infographic-bar-top">
+        <span class="infographic-bar-name" title="${name}">${name}</span>
+        <span class="infographic-bar-val" style="color:${color}">${value}</span>
+      </div>
+      <div class="infographic-bar-track">
+        <div class="infographic-bar-fill" style="width:${Math.min(100, Math.max(0, pct)).toFixed(1)}%;background:${grad}"></div>
+      </div>
+    </div>
+  </div>`;
+}
+function renderDashHeroPills(costs, tgt) {
+  const el = document.getElementById('dash-hero-pills');
+  if (!el) return;
+  const avgMargin = costs.length ? costs.reduce((s, x) => s + x.margin, 0) / costs.length : 0;
+  const onTarget = costs.filter(x => x.margin >= tgt).length;
+  el.innerHTML = `
+    <div class="dash-pill"><span class="dash-pill-val">${db.recipes.length}</span><span class="dash-pill-label">Recipes</span></div>
+    <div class="dash-pill"><span class="dash-pill-val">${db.ingredients.length}</span><span class="dash-pill-label">Ingredients</span></div>
+    <div class="dash-pill dash-pill--accent"><span class="dash-pill-val">${avgMargin.toFixed(1)}%</span><span class="dash-pill-label">Avg Margin</span></div>
+    <div class="dash-pill dash-pill--green"><span class="dash-pill-val">${onTarget}/${costs.length}</span><span class="dash-pill-label">On Target</span></div>
+    <div class="dash-pill"><span class="dash-pill-val">${tgt}%</span><span class="dash-pill-label">Target</span></div>`;
+}
+function renderDashHealthBanner(costs, tgt) {
+  const el = document.getElementById('dash-health-banner');
+  if (!el) return;
+  if (!costs.length) {
+    el.innerHTML = '<div class="health-banner-empty">Add recipes to see margin health overview</div>';
+    return;
+  }
+  const green = costs.filter(x => x.margin >= tgt).length;
+  const amber = costs.filter(x => x.margin >= tgt * 0.6 && x.margin < tgt).length;
+  const red = costs.filter(x => x.margin < tgt * 0.6).length;
+  const total = costs.length;
+  const pG = (green / total * 100).toFixed(1);
+  const pA = (amber / total * 100).toFixed(1);
+  const pR = (red / total * 100).toFixed(1);
+  el.innerHTML = `
+    <div class="health-banner-header">
+      <div class="health-banner-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Margin Health Score
+      </div>
+      <div class="health-banner-score">${Math.round(green / total * 100)}<span>% on target</span></div>
+    </div>
+    <div class="health-banner-bar">
+      ${green ? `<div class="health-seg health-seg--green" style="width:${pG}%" title="${green} on target"><span>${green}</span></div>` : ''}
+      ${amber ? `<div class="health-seg health-seg--amber" style="width:${pA}%" title="${amber} near target"><span>${amber}</span></div>` : ''}
+      ${red ? `<div class="health-seg health-seg--red" style="width:${pR}%" title="${red} below target"><span>${red}</span></div>` : ''}
+    </div>
+    <div class="health-banner-legend">
+      <span class="health-legend-item"><i class="health-dot health-dot--green"></i>On target (${green})</span>
+      <span class="health-legend-item"><i class="health-dot health-dot--amber"></i>Near target (${amber})</span>
+      <span class="health-legend-item"><i class="health-dot health-dot--red"></i>Below target (${red})</span>
+    </div>`;
+}
+
 // ===== DASHBOARD =====
 function renderDashboard() {
   const tgt = db.settings.targetMargin || 30;
@@ -1231,17 +1294,18 @@ function renderDashboard() {
   document.getElementById('dash-next-event').textContent = next ? `${next.name} - ${new Date(next.eventDate + 'T' + (next.eventTime || '00:00')).toLocaleDateString()} ${next.eventTime || ''}` : 'No upcoming events';
   const topCosts = [...costs].sort((a, b) => b.c.total - a.c.total).slice(0, 8);
   const maxCost = topCosts[0]?.c.total || 1;
-  document.getElementById('dash-top-recipes').innerHTML = topCosts.length ? topCosts.map(x => `
-    <div class="bar-item"><div class="bar-name" title="${x.r.name}">${x.r.name}</div>
-    <div class="bar-track"><div class="bar-fill" style="width:${(x.c.total / maxCost * 100).toFixed(1)}%;background:var(--blue)"></div></div>
-    <div class="bar-val">${cur(x.c.total)}</div></div>`).join('') : '<div class="text-muted text-sm">No recipes yet</div>';
+  document.getElementById('dash-top-recipes').innerHTML = topCosts.length ? topCosts.map((x, i) =>
+    renderInfographicBar(x.r.name, cur(x.c.total), x.c.total / maxCost * 100, 'var(--blue)', i + 1, 'linear-gradient(90deg, #1d5fd4, #4f8ef7)')
+  ).join('') : '<div class="infographic-empty">No recipes yet — add your first recipe to see cost rankings</div>';
   const marginList = [...costs].sort((a, b) => b.margin - a.margin).slice(0, 8);
-  document.getElementById('dash-margin-list').innerHTML = marginList.length ? marginList.map(x => {
-    const color = x.margin >= tgt ? 'var(--accent)' : x.margin >= tgt * 0.6 ? 'var(--amber)' : 'var(--red)';
-    return `<div class="bar-item"><div class="bar-name" title="${x.r.name}">${x.r.name}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, Math.max(0, x.margin)).toFixed(1)}%;background:${color}"></div></div>
-      <div class="bar-val" style="color:${color}">${x.margin.toFixed(1)}%</div></div>`;
-  }).join('') : '<div class="text-muted text-sm">No recipes yet</div>';
+  document.getElementById('dash-margin-list').innerHTML = marginList.length ? marginList.map((x, i) => {
+    const color = x.margin >= tgt ? 'var(--green-dark)' : x.margin >= tgt * 0.6 ? 'var(--amber)' : 'var(--red)';
+    const grad = x.margin >= tgt ? 'linear-gradient(90deg, #0a6847, #12b86a)' : x.margin >= tgt * 0.6 ? 'linear-gradient(90deg, #c97a08, #e8a020)' : 'linear-gradient(90deg, #d92d20, #f05246)';
+    return renderInfographicBar(x.r.name, x.margin.toFixed(1) + '%', Math.min(100, Math.max(0, x.margin)), color, i + 1, grad);
+  }).join('') : '<div class="infographic-empty">No recipes yet — margins will appear here</div>';
+
+  renderDashHeroPills(costs, tgt);
+  renderDashHealthBanner(costs, tgt);
 
   // ── Donut: Margin Health ──
   const healthGreen = costs.filter(x => x.margin >= tgt).length;
@@ -1274,15 +1338,25 @@ function renderDashboard() {
   } else {
     tbody.innerHTML = pageItems.map(x => {
       const sClass = getMarginClass(x.margin, tgt);
-      return `<tr><td class="td-name">${x.r.name}</td>
+      const statusIcon = x.margin >= tgt
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:10px;height:10px"><polyline points="20 6 9 17 4 12"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:10px;height:10px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+      return `<tr>
+        <td class="td-name">${x.r.name}</td>
         <td><span class="tag tag-blue">${x.r.category || '—'}</span></td>
         <td>${x.r.batch} ${x.r.unit || 'pcs'}</td>
         <td class="td-mono">${cur(x.c.ingCost)}</td>
         <td class="td-mono">${cur(x.c.pkgCost)}</td>
         <td class="td-mono" style="font-weight:600">${cur(x.c.total)}</td>
         <td class="td-mono sell-price">${cur(x.sell)}</td>
-        <td><span class="tag ${sClass}">${x.margin.toFixed(1)}%</span></td>
-        <td><span class="tag ${sClass}">${x.margin >= tgt ? '✓ Target Met' : '✗ Below Target'}</span></td></tr>`;
+        <td>
+          <div class="dash-margin-cell">
+            <span class="tag ${sClass}">${x.margin.toFixed(1)}%</span>
+            <div class="dash-mini-meter"><div class="dash-mini-meter-fill ${sClass}" style="width:${Math.min(100, Math.max(0, x.margin))}%"></div></div>
+          </div>
+        </td>
+        <td><span class="tag ${sClass} dash-status-tag">${statusIcon} ${x.margin >= tgt ? 'Target Met' : 'Below Target'}</span></td>
+      </tr>`;
     }).join('');
   }
   const pagination = document.getElementById('dash-pagination');
