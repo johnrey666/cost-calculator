@@ -1,35 +1,80 @@
 // ===== UNIT CONVERSION SYSTEM =====
-const unitConversions = {
-  'g': { base: 'grams', factor: 1 },
-  'kg': { base: 'grams', factor: 1000 },
-  'oz': { base: 'grams', factor: 28.3495 },
-  'lb': { base: 'grams', factor: 453.592 },
-  'ml': { base: 'ml', factor: 1 },
-  'L': { base: 'ml', factor: 1000 },
-  'tsp': { base: 'ml', factor: 4.92892 },
-  'tbsp': { base: 'ml', factor: 14.7868 },
-  'cup': { base: 'ml', factor: 236.588 },
-  'pcs': { base: 'pcs', factor: 1 },
-  'pack': { base: 'pcs', factor: 1 },
-  'bottle': { base: 'pcs', factor: 1 },
-  'can': { base: 'pcs', factor: 1 },
-  'box': { base: 'pcs', factor: 1 },
-  'bag': { base: 'pcs', factor: 1 },
-  'roll': { base: 'pcs', factor: 1 },
-  'set': { base: 'pcs', factor: 1 }
+const UNIT_ALIASES = {
+  'g': 'g', 'gram': 'g', 'grams': 'g', 'gm': 'g', 'gramme': 'g', 'grammes': 'g',
+  'kg': 'kg', 'kilogram': 'kg', 'kilograms': 'kg', 'kilo': 'kg', 'kilos': 'kg',
+  'mg': 'mg', 'milligram': 'mg', 'milligrams': 'mg',
+  'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz',
+  'lb': 'lb', 'lbs': 'lb', 'pound': 'lb', 'pounds': 'lb',
+  'ml': 'ml', 'milliliter': 'ml', 'millilitre': 'ml', 'milliliters': 'ml', 'millilitres': 'ml',
+  'l': 'l', 'liter': 'l', 'litre': 'l', 'liters': 'l', 'litres': 'l',
+  'litter': 'l', 'litters': 'l', 'ltr': 'l', 'ltrs': 'l',
+  'tsp': 'tsp', 'teaspoon': 'tsp', 'teaspoons': 'tsp',
+  'tbsp': 'tbsp', 'tablespoon': 'tbsp', 'tablespoons': 'tbsp',
+  'cup': 'cup', 'cups': 'cup',
+  'floz': 'floz', 'fl oz': 'floz', 'fluid ounce': 'floz', 'fluid ounces': 'floz',
+  'gal': 'gal', 'gallon': 'gal', 'gallons': 'gal',
+  'pcs': 'pcs', 'pc': 'pcs', 'piece': 'pcs', 'pieces': 'pcs', 'unit': 'pcs', 'units': 'pcs',
+  'pack': 'pack', 'packs': 'pack', 'package': 'pack', 'packages': 'pack',
+  'bottle': 'bottle', 'bottles': 'bottle', 'can': 'can', 'cans': 'can',
+  'box': 'box', 'boxes': 'box', 'bag': 'bag', 'bags': 'bag',
+  'roll': 'roll', 'rolls': 'roll', 'set': 'set', 'sets': 'set'
 };
 
+const unitConversions = {
+  'mg':  { base: 'mass',   factor: 0.001 },
+  'g':   { base: 'mass',   factor: 1 },
+  'kg':  { base: 'mass',   factor: 1000 },
+  'oz':  { base: 'mass',   factor: 28.3495 },
+  'lb':  { base: 'mass',   factor: 453.592 },
+  'ml':  { base: 'volume', factor: 1 },
+  'l':   { base: 'volume', factor: 1000 },
+  'tsp': { base: 'volume', factor: 4.92892 },
+  'tbsp':{ base: 'volume', factor: 14.7868 },
+  'cup': { base: 'volume', factor: 236.588 },
+  'floz':{ base: 'volume', factor: 29.5735 },
+  'gal': { base: 'volume', factor: 3785.41 },
+  'pcs': { base: 'count',  factor: 1 },
+  'pack':{ base: 'count',  factor: 1 },
+  'bottle':{ base: 'count', factor: 1 },
+  'can': { base: 'count',  factor: 1 },
+  'box': { base: 'count',  factor: 1 },
+  'bag': { base: 'count',  factor: 1 },
+  'roll':{ base: 'count',  factor: 1 },
+  'set': { base: 'count',  factor: 1 }
+};
+
+const RECIPE_UNIT_OPTIONS = ['g', 'kg', 'mg', 'ml', 'l', 'oz', 'lb', 'tsp', 'tbsp', 'cup', 'floz', 'pcs'];
+const INGREDIENT_UNIT_OPTIONS = ['g', 'kg', 'mg', 'ml', 'l', 'oz', 'lb', 'tsp', 'tbsp', 'cup', 'floz', 'gal', 'pcs', 'pack', 'bottle', 'can', 'box', 'bag'];
+const RECIPE_CATEGORIES = ['Meat', 'Vegetables', 'Rice Meal', 'Pastries', 'Others'];
+
+function normalizeUnit(unit) {
+  if (unit == null || unit === '') return '';
+  let u = String(unit).trim().toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ');
+  if (UNIT_ALIASES[u]) return UNIT_ALIASES[u];
+  const compact = u.replace(/\s/g, '');
+  if (UNIT_ALIASES[compact]) return UNIT_ALIASES[compact];
+  if (u.endsWith('s')) {
+    const singular = u.slice(0, -1);
+    if (UNIT_ALIASES[singular]) return UNIT_ALIASES[singular];
+    if (UNIT_ALIASES[singular.replace(/\s/g, '')]) return UNIT_ALIASES[singular.replace(/\s/g, '')];
+  }
+  if (unitConversions[u]) return u;
+  if (unitConversions[compact]) return compact;
+  return u;
+}
+
+function formatUnitLabel(unit) {
+  const n = normalizeUnit(unit);
+  if (n === 'l') return 'L';
+  if (n === 'ml') return 'mL';
+  if (n === 'kg') return 'kg';
+  if (n === 'floz') return 'fl oz';
+  return n;
+}
+
 function convertUnit(qty, fromUnit, toUnit) {
-  const findUnit = (unit) => {
-    if (!unit) return null;
-    const n = unit.toLowerCase();
-    for (const [key, value] of Object.entries(unitConversions)) {
-      if (key.toLowerCase() === n) return value;
-    }
-    return null;
-  };
-  const from = findUnit(fromUnit);
-  const to = findUnit(toUnit);
+  const from = unitConversions[normalizeUnit(fromUnit)];
+  const to = unitConversions[normalizeUnit(toUnit)];
   if (!from || !to) return qty;
   if (from.base !== to.base) return qty;
   return qty * (from.factor / to.factor);
@@ -37,9 +82,87 @@ function convertUnit(qty, fromUnit, toUnit) {
 
 function calcIngredientCost(recipeQty, recipeUnit, ingName) {
   const ingredient = db.ingredients.find(i => i.name === ingName);
-  if (!ingredient) return recipeQty * 0;
-  const convertedQty = convertUnit(recipeQty, recipeUnit, ingredient.unit);
-  return convertedQty * ingredient.costPerUnit;
+  if (!ingredient) return (parseFloat(recipeQty) || 0) * 0;
+  const ingUnit = normalizeUnit(ingredient.unit);
+  const rUnit = normalizeUnit(recipeUnit);
+  const convertedQty = convertUnit(parseFloat(recipeQty) || 0, rUnit, ingUnit);
+  return convertedQty * (parseFloat(ingredient.costPerUnit) || 0);
+}
+
+function unitOptionsHtml(units, selected) {
+  const sel = normalizeUnit(selected);
+  return units.map(u => `<option value="${u}" ${sel === u ? 'selected' : ''}>${formatUnitLabel(u)}</option>`).join('');
+}
+
+function migrateIngredientUnits() {
+  let changed = false;
+  (db.ingredients || []).forEach(i => {
+    if (!i.unit) return;
+    const normalized = normalizeUnit(i.unit);
+    if (normalized !== i.unit) { i.unit = normalized; changed = true; }
+  });
+  (db.packaging || []).forEach(p => {
+    if (!p.unit) return;
+    const normalized = normalizeUnit(p.unit);
+    if (normalized !== p.unit) { p.unit = normalized; changed = true; }
+  });
+  (db.recipes || []).forEach(r => {
+    (r.ingredients || []).forEach(ing => {
+      if (!ing.unit) return;
+      const normalized = normalizeUnit(ing.unit);
+      if (normalized !== ing.unit) { ing.unit = normalized; changed = true; }
+    });
+  });
+  return changed;
+}
+
+function onRecipeCategoryChange() {
+  const sel = document.getElementById('r-category');
+  const other = document.getElementById('r-category-other');
+  if (!sel || !other) return;
+  other.style.display = sel.value === 'Others' ? 'block' : 'none';
+  if (sel.value !== 'Others') other.value = '';
+}
+function getRecipeCategory() {
+  const sel = document.getElementById('r-category');
+  const other = document.getElementById('r-category-other');
+  if (!sel) return '';
+  if (sel.value === 'Others') return (other?.value || '').trim() || 'Others';
+  return sel.value;
+}
+function setRecipeCategory(category) {
+  const sel = document.getElementById('r-category');
+  const other = document.getElementById('r-category-other');
+  if (!sel) return;
+  const cat = (category || '').trim();
+  if (RECIPE_CATEGORIES.includes(cat)) {
+    sel.value = cat;
+    if (other) { other.value = ''; other.style.display = 'none'; }
+  } else if (cat) {
+    sel.value = 'Others';
+    if (other) { other.value = cat; other.style.display = 'block'; }
+  } else {
+    sel.value = '';
+    if (other) { other.value = ''; other.style.display = 'none'; }
+  }
+}
+
+// ===== ACTION ICONS =====
+const ICONS = {
+  view: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+  del: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="1"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>'
+};
+function iconBtn(cls, onclick, icon, title) {
+  return `<button type="button" class="action-btn action-icon ${cls}" onclick="${onclick}" title="${title}" aria-label="${title}">${ICONS[icon]}</button>`;
+}
+
+function computeSuggestedSellPrice(costBase, method, pval) {
+  if (method === 'markup') return costBase * (1 + pval / 100);
+  if (method === 'margin') return costBase > 0 ? costBase / (1 - pval / 100) : 0;
+  if (method === 'multiplier') return costBase * pval;
+  return costBase * 1.3;
 }
 
 // ===== DEFAULT PACKAGE TEMPLATES =====
@@ -177,14 +300,12 @@ let db = {
     multiplier: 3
   }
 };
-const INGREDIENTS_PER_PAGE = 8;
-const DASHBOARD_RECIPES_PER_PAGE = 10;
-const RECIPES_PER_PAGE = 10;
-const PRICING_PER_PAGE = 12;
+const ROWS_PER_PAGE = 5;
 let dashCurrentPage = 1;
 let ingCurrentPage = 1;
 let recipeCurrentPage = 1;
 let pricingCurrentPage = 1;
+let pkgCurrentPage = 1;
 let editingRecipeId = null;
 let viewingRecipeId = null;
 let editingIngId = null;
@@ -305,9 +426,17 @@ async function load() {
   if (!db.ingredients) db.ingredients = [];
   if (!db.packaging) db.packaging = [];
   if (!db.cnPackages) db.cnPackages = [];
-  db.ingredients.forEach(i => { if (i.unit) i.unit = i.unit.toLowerCase(); });
-  db.packaging.forEach(p => { if (p.unit) p.unit = p.unit.toLowerCase(); });
-  db.recipes.forEach(r => { if (r.unit) r.unit = r.unit.toLowerCase(); });
+  db.ingredients.forEach(i => { if (i.unit) i.unit = normalizeUnit(i.unit); });
+  db.packaging.forEach(p => { if (p.unit) p.unit = normalizeUnit(p.unit); });
+  db.recipes.forEach(r => {
+    if (r.unit) r.unit = r.unit.toLowerCase();
+    (r.ingredients || []).forEach(ing => { if (ing.unit) ing.unit = normalizeUnit(ing.unit); });
+    (r.packaging || []).forEach(pkg => { if (pkg.unit) pkg.unit = normalizeUnit(pkg.unit); });
+  });
+  let migrated = migrateRecipePrices();
+  if (migrateIngredientUnits()) migrated = true;
+  if (migratePriceHistory()) migrated = true;
+  if (migrated) await save();
   const savedTheme = localStorage.getItem('theme') || db.settings.theme;
   if (savedTheme === 'dark') document.body.classList.add('dark-theme');
   else document.body.classList.remove('dark-theme');
@@ -430,10 +559,10 @@ function buildPagination(current, totalPages, fnName, totalItems, perPage, noun)
   if (totalItems === 0) return `<div class="page-info">No ${noun}</div>`;
   const start = (current - 1) * perPage + 1;
   const end = Math.min(current * perPage, totalItems);
-  const info = `<div class="page-info">${start}–${end} of ${totalItems} ${noun}</div>`;
+  const info = `<div class="page-info">Showing ${start}–${end} of ${totalItems} ${noun}</div>`;
   if (totalPages <= 1) return info;
   const pages = [];
-  const add = p => pages.push(p);
+  const add = p => { if (!pages.includes(p)) pages.push(p); };
   add(1);
   let lo = Math.max(2, current - 1), hi = Math.min(totalPages - 1, current + 1);
   if (lo > 2) add('...');
@@ -442,11 +571,11 @@ function buildPagination(current, totalPages, fnName, totalItems, perPage, noun)
   if (totalPages > 1) add(totalPages);
   const numBtns = pages.map(p => p === '...'
     ? `<span class="page-ellipsis">…</span>`
-    : `<button class="page-btn ${p === current ? 'active' : ''}" onclick="${fnName}(${p})">${p}</button>`).join('');
+    : `<button type="button" class="page-btn ${p === current ? 'active' : ''}" onclick="${fnName}(${p})">${p}</button>`).join('');
   const controls = `<div class="page-controls">
-    <button class="page-btn" ${current === 1 ? 'disabled' : ''} onclick="${fnName}(${current - 1})">‹</button>
+    <button type="button" class="page-btn page-nav" ${current === 1 ? 'disabled' : ''} onclick="${fnName}(${current - 1})" title="Previous">‹</button>
     ${numBtns}
-    <button class="page-btn" ${current === totalPages ? 'disabled' : ''} onclick="${fnName}(${current + 1})">›</button>
+    <button type="button" class="page-btn page-nav" ${current === totalPages ? 'disabled' : ''} onclick="${fnName}(${current + 1})" title="Next">›</button>
   </div>`;
   return info + controls;
 }
@@ -461,14 +590,14 @@ function calcRecipeCosts(recipe) {
   return { ingCost, pkgCost, baseCost, vatCost, total };
 }
 function calcSellPrice(recipe) {
+  if (recipe.sellPrice != null && recipe.sellPrice > 0) return parseFloat(recipe.sellPrice);
+  return 0;
+}
+function calcSuggestedSellPrice(recipe) {
   const { baseCost } = calcRecipeCosts(recipe);
-  if (recipe.sellPrice) return parseFloat(recipe.sellPrice);
   const method = recipe.pricingMethod || db.settings.pricingMethod || 'markup';
-  const val = parseFloat(recipe.pricingValue || 30);
-  if (method === 'markup') return baseCost * (1 + val / 100);
-  if (method === 'margin') return baseCost / (1 - val / 100);
-  if (method === 'multiplier') return baseCost * val;
-  return baseCost * 1.3;
+  const val = parseFloat(recipe.pricingValue ?? db.settings.markup ?? 30);
+  return computeSuggestedSellPrice(baseCost, method, val);
 }
 function calcMargin(recipe) {
   const { baseCost } = calcRecipeCosts(recipe);
@@ -476,13 +605,164 @@ function calcMargin(recipe) {
   if (!sell) return 0;
   return ((sell - baseCost) / sell) * 100;
 }
+function getMarginClass(margin, tgt) {
+  tgt = tgt ?? db.settings.targetMargin ?? 30;
+  if (margin < 0) return 'tag-red';
+  if (margin >= tgt) return 'tag-green';
+  if (margin >= tgt * 0.6) return 'tag-amber';
+  return 'tag-red';
+}
+function migrateRecipePrices() {
+  let changed = false;
+  (db.recipes || []).forEach(r => {
+    if (r.sellPrice != null && r.sellPrice > 0) {
+      if (!r.priceLocked) { r.priceLocked = true; changed = true; }
+      return;
+    }
+    if (!r.priceLocked) {
+      r.sellPrice = calcSuggestedSellPrice(r);
+      r.priceLocked = true;
+      changed = true;
+    }
+  });
+  return changed;
+}
+function appendPriceHistory(history, price, date) {
+  const list = Array.isArray(history) ? [...history] : [];
+  const p = parseFloat(price);
+  if (!p || p <= 0) return list;
+  const last = list[list.length - 1];
+  if (last && Math.abs(last.price - p) < 0.009) return list;
+  list.push({ date: date || Date.now(), price: p });
+  return list;
+}
+function migratePriceHistory() {
+  let changed = false;
+  (db.recipes || []).forEach(r => {
+    if (!Array.isArray(r.priceHistory)) { r.priceHistory = []; changed = true; }
+    if (r.priceHistory.length === 0 && r.sellPrice > 0) {
+      const entries = [];
+      if (r.lastSellPrice > 0 && Math.abs(r.lastSellPrice - r.sellPrice) > 0.009) {
+        entries.push({ date: Date.now() - 7 * 86400000, price: r.lastSellPrice });
+      }
+      entries.push({ date: Date.now(), price: r.sellPrice });
+      r.priceHistory = entries;
+      changed = true;
+    }
+  });
+  return changed;
+}
+function formatChartDate(ts) {
+  return new Date(ts).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function formatChartDateShort(ts) {
+  return new Date(ts).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+}
+function renderPriceLineChart(el, history, recipeName) {
+  if (!el || !history.length) return;
+  const sorted = [...history].sort((a, b) => a.date - b.date);
+  const w = 720, h = 220;
+  const pad = { top: 24, right: 28, bottom: 44, left: 62 };
+  const chartW = w - pad.left - pad.right;
+  const chartH = h - pad.top - pad.bottom;
+  const prices = sorted.map(p => p.price);
+  const minP = Math.min(...prices);
+  const maxP = Math.max(...prices);
+  const rangeP = maxP - minP || maxP * 0.15 || 10;
+  const yMin = Math.max(0, minP - rangeP * 0.12);
+  const yMax = maxP + rangeP * 0.12;
+  const ySpan = yMax - yMin || 1;
+  const n = sorted.length;
+  const toX = i => pad.left + (n === 1 ? chartW / 2 : (i / (n - 1)) * chartW);
+  const toY = price => pad.top + chartH - ((price - yMin) / ySpan) * chartH;
+  const points = sorted.map((p, i) => ({ x: toX(i), y: toY(p.price), ...p }));
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const yTicks = 4;
+  const yGrid = Array.from({ length: yTicks + 1 }, (_, i) => {
+    const val = yMin + (ySpan * i / yTicks);
+    const y = toY(val);
+    return `<line x1="${pad.left}" y1="${y.toFixed(1)}" x2="${w - pad.right}" y2="${y.toFixed(1)}" class="chart-grid-line"/>
+      <text x="${pad.left - 8}" y="${(y + 4).toFixed(1)}" class="chart-axis-label" text-anchor="end">${cur(val)}</text>`;
+  }).join('');
+  const xLabels = points.map(p => `
+    <text x="${p.x.toFixed(1)}" y="${h - 12}" class="chart-axis-label" text-anchor="middle">${formatChartDateShort(p.date)}</text>
+  `).join('');
+  const dots = points.map(p => `
+    <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" class="chart-dot" data-price="${p.price}">
+      <title>${formatChartDate(p.date)} — ${cur(p.price)}</title>
+    </circle>
+  `).join('');
+  const areaPath = n > 1
+    ? `${linePath} L${points[n - 1].x.toFixed(1)},${(pad.top + chartH).toFixed(1)} L${points[0].x.toFixed(1)},${(pad.top + chartH).toFixed(1)} Z`
+    : '';
+  el.innerHTML = `
+    <div class="chart-summary">
+      <span class="chart-summary-name">${recipeName}</span>
+      <span class="chart-summary-stat">${n} price change${n !== 1 ? 's' : ''} recorded</span>
+      <span class="chart-summary-current sell-price">${cur(sorted[sorted.length - 1].price)}</span>
+    </div>
+    <div class="chart-svg-wrap">
+      <svg class="price-chart-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
+        ${yGrid}
+        <line x1="${pad.left}" y1="${pad.top + chartH}" x2="${w - pad.right}" y2="${pad.top + chartH}" class="chart-axis-line"/>
+        <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + chartH}" class="chart-axis-line"/>
+        ${areaPath ? `<path d="${areaPath}" class="chart-area"/>` : ''}
+        ${n > 1 ? `<path d="${linePath}" class="chart-line"/>` : ''}
+        ${dots}
+        ${xLabels}
+      </svg>
+    </div>
+    <div class="chart-legend-row">
+      ${points.map(p => `<span class="chart-legend-pill"><span class="chart-legend-date">${formatChartDateShort(p.date)}</span> <span class="sell-price">${cur(p.price)}</span></span>`).join('')}
+    </div>`;
+}
+function populateDashPriceChartDropdown() {
+  const sel = document.getElementById('dash-price-chart-recipe');
+  if (!sel) return;
+  const cur = sel.value;
+  const sorted = [...db.recipes].sort((a, b) => a.name.localeCompare(b.name));
+  sel.innerHTML = '<option value="">Select a recipe...</option>' + sorted.map(r =>
+    `<option value="${r.id}" ${r.id === cur ? 'selected' : ''}>${r.name}</option>`
+  ).join('');
+}
+function renderDashPriceChart() {
+  const el = document.getElementById('dash-price-chart');
+  const sel = document.getElementById('dash-price-chart-recipe');
+  if (!el || !sel) return;
+  const recipeId = sel.value;
+  if (!recipeId) {
+    el.innerHTML = '<div class="chart-empty">Select a recipe from the dropdown to view its selling price history.</div>';
+    return;
+  }
+  const recipe = db.recipes.find(r => r.id === recipeId);
+  if (!recipe) {
+    el.innerHTML = '<div class="chart-empty">Recipe not found.</div>';
+    return;
+  }
+  const history = recipe.priceHistory || [];
+  if (!history.length) {
+    el.innerHTML = '<div class="chart-empty">No price history yet. Edit the recipe and save a selling price to start tracking.</div>';
+    return;
+  }
+  renderPriceLineChart(el, history, recipe.name);
+}
+function checkAffectedRecipeMargins(ingredientName) {
+  const tgt = db.settings.targetMargin || 30;
+  const affected = db.recipes.filter(r => r.ingredients?.some(x => x.name === ingredientName));
+  if (!affected.length) return;
+  const warnings = affected.map(r => ({ name: r.name, margin: calcMargin(r) })).filter(x => x.margin < tgt);
+  if (!warnings.length) return;
+  const detail = warnings.map(w => `${w.name} (${w.margin.toFixed(1)}%)`).join(', ');
+  setTimeout(() => toast(`Low margin alert — ${detail}`, 'amber'), 400);
+}
 
 // ===== RECIPE MODAL =====
 function resetRecipeModal() {
   document.getElementById('recipe-modal-title').textContent = 'New Recipe';
-  ['r-name', 'r-category', 'r-unit', 'r-notes', 'r-sell-price'].forEach(id => {
+  ['r-name', 'r-unit', 'r-notes', 'r-sell-price'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  setRecipeCategory('');
   const b = document.getElementById('r-batch'); if (b) b.value = 1;
   const pv = document.getElementById('r-pricing-value'); if (pv) pv.value = db.settings.markup || 30;
   const pm = document.getElementById('r-pricing-method'); if (pm) pm.value = db.settings.pricingMethod || 'markup';
@@ -494,8 +774,8 @@ function resetRecipeModal() {
 function addIngredientRow(data) {
   const tbody = document.getElementById('recipe-ing-rows');
   const row = document.createElement('tr');
-  const ingOptions = db.ingredients.map(i => `<option value="${i.name}" data-cost="${i.costPerUnit}" data-unit="${i.unit}">${i.name} (${i.unit})</option>`).join('');
-  const unitOptions = ['g', 'kg', 'ml', 'L', 'oz', 'lb', 'tsp', 'tbsp', 'cup', 'pcs'].map(u => `<option value="${u}" ${data && data.unit === u ? 'selected' : ''}>${u}</option>`).join('');
+  const ingOptions = db.ingredients.map(i => `<option value="${i.name}" data-cost="${i.costPerUnit}" data-unit="${i.unit}">${i.name} (${formatUnitLabel(i.unit)})</option>`).join('');
+  const unitOptions = unitOptionsHtml(RECIPE_UNIT_OPTIONS, data && data.unit);
   const isExisting = data && db.ingredients.find(i => i.name === data.name);
   const costValue = data && data.costPerUnit ? data.costPerUnit : '';
   row.innerHTML = `
@@ -532,7 +812,7 @@ function fillIngCost(sel) {
   if (opt.value) {
     row.querySelector('.ing-name-input').value = opt.value;
     row.querySelectorAll('input')[1].value = '';
-    row.querySelectorAll('select')[1].value = opt.dataset.unit || 'g';
+    row.querySelectorAll('select')[1].value = normalizeUnit(opt.dataset.unit) || 'g';
     const costInput = row.querySelector('.ing-cost-input');
     costInput.value = opt.dataset.cost || '';
     costInput.disabled = true; costInput.style.background = 'var(--surface3)'; costInput.style.color = 'var(--text3)'; costInput.style.cursor = 'not-allowed';
@@ -593,13 +873,13 @@ function filterIngredientOptions(input) {
   const filter = (input.value || '').toLowerCase();
   const select = row.querySelector('select');
   if (!select) return;
-  const options = db.ingredients.filter(i => i.name.toLowerCase().includes(filter)).map(i => `<option value="${i.name}" data-cost="${i.costPerUnit}" data-unit="${i.unit}">${i.name} (${i.unit})</option>`).join('');
+  const options = db.ingredients.filter(i => i.name.toLowerCase().includes(filter)).map(i => `<option value="${i.name}" data-cost="${i.costPerUnit}" data-unit="${i.unit}">${i.name} (${formatUnitLabel(i.unit)})</option>`).join('');
   select.innerHTML = `<option value="">-- Select or type --</option>${options}`;
   const exact = db.ingredients.find(i => i.name.toLowerCase() === filter);
   if (exact) {
     select.value = exact.name;
     const unitSelect = row.querySelectorAll('select')[1];
-    if (unitSelect) unitSelect.value = exact.unit || 'g';
+    if (unitSelect) unitSelect.value = normalizeUnit(exact.unit) || 'g';
     const costInput = row.querySelector('.ing-cost-input');
     if (costInput) { costInput.value = exact.costPerUnit || 0; costInput.disabled = true; costInput.style.background = 'var(--surface3)'; costInput.style.color = 'var(--text3)'; costInput.style.cursor = 'not-allowed'; }
   } else {
@@ -642,7 +922,7 @@ function getRowData(tbody, isIngredient = false) {
       const costInput = row.querySelector('.pkg-cost-input');
       if (costInput) costPerUnit = parseFloat(costInput.value) || 0;
     }
-    return { name, qty, unit, costPerUnit };
+    return { name, qty, unit: normalizeUnit(unit), costPerUnit };
   }).filter(r => r.name || r.qty);
 }
 function updateRecipeCostPreview() {
@@ -667,11 +947,17 @@ function updateRecipeCostPreview() {
   const method = document.getElementById('r-pricing-method').value;
   const pval = parseFloat(document.getElementById('r-pricing-value').value) || 0;
   const manualPrice = parseFloat(document.getElementById('r-sell-price').value) || 0;
-  let sellPrice = manualPrice || 0;
-  if (!sellPrice) {
-    if (method === 'markup') sellPrice = baseTotal * (1 + pval / 100);
-    else if (method === 'margin') sellPrice = baseTotal > 0 ? baseTotal / (1 - pval / 100) : 0;
-    else if (method === 'multiplier') sellPrice = baseTotal * pval;
+  const existing = editingRecipeId ? db.recipes.find(r => r.id === editingRecipeId) : null;
+  const suggestedPrice = computeSuggestedSellPrice(baseTotal, method, pval);
+  let sellPrice = manualPrice;
+  let priceLocked = false;
+  if (!sellPrice && existing?.sellPrice > 0) {
+    sellPrice = existing.sellPrice;
+    priceLocked = true;
+  } else if (!sellPrice) {
+    sellPrice = suggestedPrice;
+  } else {
+    priceLocked = true;
   }
   const margin = sellPrice > 0 ? ((sellPrice - baseTotal) / sellPrice * 100) : 0;
   document.getElementById('prev-ing').textContent = cur(ingCost);
@@ -680,6 +966,15 @@ function updateRecipeCostPreview() {
   document.getElementById('prev-vat-row').style.display = includeVat ? 'flex' : 'none';
   document.getElementById('prev-total').textContent = cur(total);
   document.getElementById('prev-price').textContent = cur(sellPrice);
+  const priceLabel = document.getElementById('prev-price-label');
+  if (priceLabel) priceLabel.textContent = priceLocked ? 'Sell Price' : 'Suggested Sell Price';
+  const suggestedRow = document.getElementById('prev-suggested-row');
+  const suggestedEl = document.getElementById('prev-suggested');
+  if (suggestedRow && suggestedEl) {
+    const showSuggested = priceLocked && Math.abs(suggestedPrice - sellPrice) > 0.01;
+    suggestedRow.style.display = showSuggested ? 'flex' : 'none';
+    if (showSuggested) suggestedEl.textContent = cur(suggestedPrice);
+  }
   document.getElementById('prev-margin').textContent = margin.toFixed(1) + '%';
   const meter = document.getElementById('prev-meter');
   meter.style.width = Math.min(100, Math.max(0, margin)) + '%';
@@ -695,7 +990,7 @@ async function saveRecipe() {
   const packaging = getRowData(document.getElementById('recipe-pkg-rows'), false);
   ingredients.forEach(ing => {
     if (ing.name && ing.costPerUnit > 0 && !db.ingredients.find(i => i.name === ing.name)) {
-      db.ingredients.push({ id: uid(), name: ing.name, category: 'Imported from Recipe', quantity: ing.qty || 1, unit: ing.unit, totalCost: ing.costPerUnit * (ing.qty || 1), costPerUnit: ing.costPerUnit, supplier: '' });
+      db.ingredients.push({ id: uid(), name: ing.name, category: 'Imported from Recipe', unit: ing.unit, costPerUnit: ing.costPerUnit, supplier: '' });
     }
   });
   packaging.forEach(pkg => {
@@ -703,17 +998,35 @@ async function saveRecipe() {
       db.packaging.push({ id: uid(), name: pkg.name, type: 'Imported from Recipe', unit: pkg.unit, costPerUnit: pkg.costPerUnit, supplier: '' });
     }
   });
+  const existing = editingRecipeId ? db.recipes.find(r => r.id === editingRecipeId) : null;
+  const ingCost = ingredients.reduce((s, r) => s + calcIngredientCost(r.qty, r.unit, r.name), 0);
+  const pkgCost = packaging.reduce((s, r) => s + r.qty * r.costPerUnit, 0);
+  const baseTotal = ingCost + pkgCost;
+  const method = document.getElementById('r-pricing-method').value;
+  const pval = parseFloat(document.getElementById('r-pricing-value').value) || 0;
+  const manualPrice = parseFloat(document.getElementById('r-sell-price').value) || 0;
+  let sellPrice = manualPrice;
+  if (!sellPrice && existing?.sellPrice > 0) sellPrice = existing.sellPrice;
+  else if (!sellPrice) sellPrice = computeSuggestedSellPrice(baseTotal, method, pval);
+  let lastSellPrice = existing?.lastSellPrice ?? null;
+  if (existing?.sellPrice > 0 && Math.abs(sellPrice - existing.sellPrice) > 0.009) {
+    lastSellPrice = existing.sellPrice;
+  }
+  let priceHistory = appendPriceHistory(existing?.priceHistory || [], sellPrice);
   const recipe = {
     id: editingRecipeId || uid(),
-    name, category: document.getElementById('r-category').value.trim(),
+    name, category: getRecipeCategory(),
     batch: parseInt(document.getElementById('r-batch').value) || 1,
     unit: document.getElementById('r-unit').value.trim().toLowerCase(),
     notes: document.getElementById('r-notes').value.trim(),
     ingredients, packaging,
     includeVat: document.getElementById('r-include-vat')?.checked || false,
-    pricingMethod: document.getElementById('r-pricing-method').value,
-    pricingValue: parseFloat(document.getElementById('r-pricing-value').value) || 0,
-    sellPrice: parseFloat(document.getElementById('r-sell-price').value) || 0,
+    pricingMethod: method,
+    pricingValue: pval,
+    sellPrice,
+    lastSellPrice,
+    priceHistory,
+    priceLocked: true,
   };
   const isNew = !editingRecipeId;
   if (editingRecipeId) {
@@ -733,7 +1046,7 @@ function editRecipe(id) {
   editingRecipeId = id;
   document.getElementById('recipe-modal-title').textContent = 'Edit Recipe';
   document.getElementById('r-name').value = r.name;
-  document.getElementById('r-category').value = r.category || '';
+  setRecipeCategory(r.category || '');
   document.getElementById('r-batch').value = r.batch || 1;
   document.getElementById('r-unit').value = r.unit || '';
   document.getElementById('r-notes').value = r.notes || '';
@@ -767,6 +1080,22 @@ function viewRecipe(id) {
   renderViewRecipeModal();
   showModal('view-recipe-modal');
 }
+function renderViewRecipeFooter(r, sell) {
+  const footerPrice = document.getElementById('view-recipe-price-footer');
+  if (!footerPrice) return;
+  const hasLast = r.lastSellPrice != null && r.lastSellPrice > 0;
+  footerPrice.innerHTML = `
+    <div class="view-recipe-price-block">
+      <div>
+        <div class="view-recipe-price-label">Selling Price</div>
+        <div class="view-recipe-price-main sell-price">${cur(sell)}</div>
+      </div>
+      ${hasLast ? `<div class="view-recipe-price-last-wrap">
+        <div class="view-recipe-price-label">Last Selling Price</div>
+        <div class="view-recipe-price-last">${cur(r.lastSellPrice)}</div>
+      </div>` : ''}
+    </div>`;
+}
 function renderViewRecipeModal() {
   if (!viewingRecipeId) return;
   const r = db.recipes.find(x => x.id === viewingRecipeId); if (!r) return;
@@ -775,23 +1104,28 @@ function renderViewRecipeModal() {
   const profit = sell - (r.includeVat ? total - vatCost : total);
   const margin = calcMargin(r);
   const tgt = db.settings.targetMargin || 30;
-  const statusColor = margin >= tgt ? 'tag-green' : margin >= tgt * 0.6 ? 'tag-amber' : 'tag-red';
+  const statusColor = getMarginClass(margin, tgt);
   document.getElementById('view-recipe-details').innerHTML = `
     <div class="section-divider">Ingredients</div>
-    ${(r.ingredients || []).map(i => `<div class="view-ingredient-row"><span>${i.name} × ${i.qty} ${i.unit}</span><span class="td-mono">${cur(calcIngredientCost(i.qty, i.unit, i.name))}</span></div>`).join('')}
+    ${(r.ingredients || []).map(i => {
+      const ing = db.ingredients.find(x => x.name === i.name);
+      const ingUnit = ing ? formatUnitLabel(ing.unit) : formatUnitLabel(i.unit);
+      return `<div class="view-ingredient-row"><span>${i.name} × ${i.qty} ${formatUnitLabel(i.unit)}</span><span class="td-mono">${cur(calcIngredientCost(i.qty, i.unit, i.name))}</span></div>
+      <div class="view-ingredient-sub" style="font-size:10px;color:var(--text4);padding:0 0 6px 0">Master: ${cur(ing?.costPerUnit || 0)} / ${ingUnit}</div>`;
+    }).join('')}
     <div class="section-divider">Packaging</div>
-    ${(r.packaging || []).map(p => `<div class="view-ingredient-row"><span>${p.name} × ${p.qty} ${p.unit}</span><span class="td-mono">${cur(p.qty * p.costPerUnit)}</span></div>`).join('')}
+    ${(r.packaging || []).map(p => `<div class="view-ingredient-row"><span>${p.name} × ${p.qty} ${formatUnitLabel(p.unit)}</span><span class="td-mono">${cur(p.qty * p.costPerUnit)}</span></div>`).join('')}
     <div class="cost-summary mt-4">
       <div class="cost-row"><span class="cost-label">Ingredient Cost</span><span class="cost-val">${cur(ingCost)}</span></div>
       <div class="cost-row"><span class="cost-label">Packaging Cost</span><span class="cost-val">${cur(pkgCost)}</span></div>
       ${r.includeVat ? `<div class="cost-row"><span class="cost-label">VAT (12%)</span><span class="cost-val">${cur(vatCost)}</span></div>` : ''}
       <div class="cost-row total"><span class="cost-label">Total Cost</span><span class="cost-val">${cur(total)}</span></div>
-      <div class="cost-row total"><span class="cost-label">Sell Price</span><span class="cost-val">${cur(sell)}</span></div>
       <div class="cost-row total"><span class="cost-label">Gross Profit</span><span class="cost-val">${cur(profit)}</span></div>
-      <div class="cost-row total"><span class="cost-label">Margin</span><span class="cost-val ${statusColor}" style="padding:2px 8px;border-radius:20px">${margin.toFixed(1)}%</span></div>
+      <div class="cost-row total"><span class="cost-label">Margin</span><span class="cost-val tag ${statusColor}" style="padding:2px 8px">${margin.toFixed(1)}%</span></div>
       <div class="margin-meter mt-2"><div class="meter-track"><div class="meter-fill" style="width:${Math.min(100, Math.max(0, margin))}%;background:${margin >= tgt ? 'var(--accent)' : margin >= tgt * 0.6 ? 'var(--amber)' : 'var(--red)'}"></div></div></div>
     </div>
     ${r.notes ? `<div class="mt-4 text-sm text-muted">${r.notes}</div>` : ''}`;
+  renderViewRecipeFooter(r, sell);
 }
 
 // ===== RENDER RECIPES =====
@@ -816,15 +1150,15 @@ function renderRecipes() {
     return;
   }
   const tgt = db.settings.targetMargin || 30;
-  const totalPages = Math.max(1, Math.ceil(list.length / RECIPES_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(list.length / ROWS_PER_PAGE));
   if (recipeCurrentPage > totalPages) recipeCurrentPage = totalPages;
   const fullList = list;
-  list = list.slice((recipeCurrentPage - 1) * RECIPES_PER_PAGE, recipeCurrentPage * RECIPES_PER_PAGE);
+  list = list.slice((recipeCurrentPage - 1) * ROWS_PER_PAGE, recipeCurrentPage * ROWS_PER_PAGE);
   tbody.innerHTML = list.map(r => {
     const c = calcRecipeCosts(r);
     const sell = calcSellPrice(r);
     const margin = calcMargin(r);
-    const sClass = margin >= tgt ? 'tag-green' : margin >= tgt * 0.6 ? 'tag-amber' : 'tag-red';
+    const sClass = getMarginClass(margin, tgt);
     return `<tr>
       <td class="td-name">${r.name}</td>
       <td><span class="tag tag-blue">${r.category || '—'}</span></td>
@@ -832,23 +1166,31 @@ function renderRecipes() {
       <td class="td-mono">${cur(c.ingCost)}</td>
       <td class="td-mono">${cur(c.pkgCost)}</td>
       <td class="td-mono" style="font-weight:600;color:var(--text)">${cur(c.total)}</td>
-      <td class="td-mono" style="color:var(--accent)">${cur(sell)}</td>
+      <td class="td-mono sell-price">${cur(sell)}</td>
       <td><span class="tag ${sClass}">${margin.toFixed(1)}%</span></td>
       <td><div class="td-actions">
-        <button class="action-btn action-view" onclick="viewRecipe('${r.id}')">View</button>
-        <button class="action-btn action-edit" onclick="editRecipe('${r.id}')">Edit</button>
-        <button class="action-btn action-del" onclick="deleteRecipe('${r.id}')">Del</button>
+        ${iconBtn('action-view', `viewRecipe('${r.id}')`, 'view', 'View')}
+        ${iconBtn('action-edit', `editRecipe('${r.id}')`, 'edit', 'Edit')}
+        ${iconBtn('action-del', `deleteRecipe('${r.id}')`, 'del', 'Delete')}
       </div></td>
     </tr>`;
   }).join('');
-  if (paginationEl) paginationEl.innerHTML = buildPagination(recipeCurrentPage, totalPages, 'setRecipePage', fullList.length, RECIPES_PER_PAGE, 'recipes');
+  if (paginationEl) paginationEl.innerHTML = buildPagination(recipeCurrentPage, totalPages, 'setRecipePage', fullList.length, ROWS_PER_PAGE, 'recipes');
 }
-function setRecipePage(page) { recipeCurrentPage = Math.max(1, page); renderRecipes(); }
+function setRecipePage(page) {
+  const search = (document.getElementById('recipe-search')?.value || '').toLowerCase();
+  const cat = document.getElementById('recipe-filter-cat')?.value || '';
+  let list = db.recipes.filter(r => r.name.toLowerCase().includes(search) && (!cat || r.category === cat));
+  const totalPages = Math.max(1, Math.ceil(list.length / ROWS_PER_PAGE));
+  recipeCurrentPage = Math.min(Math.max(1, page), totalPages);
+  renderRecipes();
+}
 function renderRecipeCategoryFilter() {
-  const cats = [...new Set(db.recipes.map(r => r.category).filter(Boolean))];
+  const custom = [...new Set(db.recipes.map(r => r.category).filter(c => c && !RECIPE_CATEGORIES.includes(c)))];
+  const allCats = [...RECIPE_CATEGORIES.filter(c => c !== 'Others'), ...custom];
   const sel = document.getElementById('recipe-filter-cat');
   const cur2 = sel.value;
-  sel.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${c}" ${c === cur2 ? 'selected' : ''}>${c}</option>`).join('');
+  sel.innerHTML = '<option value="">All Categories</option>' + allCats.map(c => `<option value="${c}" ${c === cur2 ? 'selected' : ''}>${c}</option>`).join('');
 }
 
 // ===== DASHBOARD =====
@@ -909,58 +1251,57 @@ function renderDashboard() {
 
   const search = (document.getElementById('dash-search')?.value || '').toLowerCase().trim();
   const filtered = costs.filter(x => !search || x.r.name.toLowerCase().includes(search) || (x.r.category || '').toLowerCase().includes(search));
-  const totalPages = Math.max(1, Math.ceil(filtered.length / DASHBOARD_RECIPES_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
   if (dashCurrentPage > totalPages) dashCurrentPage = totalPages;
-  const pageItems = filtered.slice((dashCurrentPage - 1) * DASHBOARD_RECIPES_PER_PAGE, dashCurrentPage * DASHBOARD_RECIPES_PER_PAGE);
+  const pageItems = filtered.slice((dashCurrentPage - 1) * ROWS_PER_PAGE, dashCurrentPage * ROWS_PER_PAGE);
   const tbody = document.getElementById('dash-table-body');
   if (!pageItems.length) {
     tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state" style="padding:40px"><h3>No recipes match your search</h3></div></td></tr>`;
   } else {
     tbody.innerHTML = pageItems.map(x => {
-      const sClass = x.margin >= tgt ? 'tag-green' : x.margin >= tgt * 0.6 ? 'tag-amber' : 'tag-red';
+      const sClass = getMarginClass(x.margin, tgt);
       return `<tr><td class="td-name">${x.r.name}</td>
         <td><span class="tag tag-blue">${x.r.category || '—'}</span></td>
         <td>${x.r.batch} ${x.r.unit || 'pcs'}</td>
         <td class="td-mono">${cur(x.c.ingCost)}</td>
         <td class="td-mono">${cur(x.c.pkgCost)}</td>
         <td class="td-mono" style="font-weight:600">${cur(x.c.total)}</td>
-        <td class="td-mono" style="color:var(--accent)">${cur(x.sell)}</td>
+        <td class="td-mono sell-price">${cur(x.sell)}</td>
         <td><span class="tag ${sClass}">${x.margin.toFixed(1)}%</span></td>
         <td><span class="tag ${sClass}">${x.margin >= tgt ? '✓ Target Met' : '✗ Below Target'}</span></td></tr>`;
     }).join('');
   }
   const pagination = document.getElementById('dash-pagination');
   if (pagination) {
-    pagination.innerHTML = buildPagination(dashCurrentPage, totalPages, 'setDashPage', filtered.length, DASHBOARD_RECIPES_PER_PAGE, 'recipes');
+    pagination.innerHTML = buildPagination(dashCurrentPage, totalPages, 'setDashPage', filtered.length, ROWS_PER_PAGE, 'recipes');
   }
+  populateDashPriceChartDropdown();
+  renderDashPriceChart();
 }
-function setDashPage(page) { dashCurrentPage = Math.max(1, page); renderDashboard(); }
+function setDashPage(page) {
+  const search = (document.getElementById('dash-search')?.value || '').toLowerCase();
+  const filtered = db.recipes.filter(r => r.name.toLowerCase().includes(search));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
+  dashCurrentPage = Math.min(Math.max(1, page), totalPages);
+  renderDashboard();
+}
 
 // ===== INGREDIENTS =====
 function resetIngModal() {
   document.getElementById('ing-modal-title').textContent = 'Add Ingredient';
   ['ing-name', 'ing-sku', 'ing-cat', 'ing-supplier'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('ing-qty').value = 1;
   document.getElementById('ing-unit').value = 'g';
   document.getElementById('ing-cost').value = 0;
-  document.getElementById('ing-unit-cost').value = 0;
-  document.getElementById('ing-cost').oninput = calculateIngUnitCost;
-  document.getElementById('ing-qty').oninput = calculateIngUnitCost;
-}
-function calculateIngUnitCost() {
-  const qty = parseFloat(document.getElementById('ing-qty').value) || 1;
-  const totalCost = parseFloat(document.getElementById('ing-cost').value) || 0;
-  document.getElementById('ing-unit-cost').value = (qty > 0 ? totalCost / qty : 0).toFixed(2);
 }
 function saveIngredient() {
   const name = document.getElementById('ing-name').value.trim();
   if (!name) { toast('Name is required!', 'red'); return; }
-  const qty = parseFloat(document.getElementById('ing-qty').value) || 1;
-  const totalCost = parseFloat(document.getElementById('ing-cost').value) || 0;
-  const ing = { id: editingIngId || uid(), sku: document.getElementById('ing-sku').value.trim(), name, category: document.getElementById('ing-cat').value.trim(), quantity: qty, unit: document.getElementById('ing-unit').value.toLowerCase(), totalCost, costPerUnit: qty > 0 ? totalCost / qty : 0, supplier: document.getElementById('ing-supplier').value.trim() };
+  const costPerUnit = parseFloat(document.getElementById('ing-cost').value) || 0;
+  const ing = { id: editingIngId || uid(), sku: document.getElementById('ing-sku').value.trim(), name, category: document.getElementById('ing-cat').value.trim(), unit: normalizeUnit(document.getElementById('ing-unit').value), costPerUnit, supplier: document.getElementById('ing-supplier').value.trim() };
   if (editingIngId) { const idx = db.ingredients.findIndex(i => i.id === editingIngId); if (idx >= 0) db.ingredients[idx] = ing; }
   else db.ingredients.push(ing);
-  save(); closeModal('ingredient-modal'); renderIngredients(); renderIngCategoryFilter(); refreshRecipeNameLists();
+  save(); closeModal('ingredient-modal'); renderIngredients(); renderIngCategoryFilter(); refreshRecipeNameLists(); renderRecipes(); renderDashboard();
+  checkAffectedRecipeMargins(name);
   toast(editingIngId ? 'Ingredient updated!' : 'Ingredient saved!');
   editingIngId = null;
 }
@@ -971,13 +1312,9 @@ function editIngredient(id) {
   document.getElementById('ing-name').value = i.name;
   document.getElementById('ing-sku').value = i.sku || '';
   document.getElementById('ing-cat').value = i.category || '';
-  document.getElementById('ing-qty').value = i.quantity || 1;
-  document.getElementById('ing-unit').value = i.unit;
-  document.getElementById('ing-cost').value = i.totalCost || (i.costPerUnit * (i.quantity || 1));
-  document.getElementById('ing-unit-cost').value = i.costPerUnit || 0;
+  document.getElementById('ing-unit').value = normalizeUnit(i.unit) || 'g';
+  document.getElementById('ing-cost').value = i.costPerUnit || 0;
   document.getElementById('ing-supplier').value = i.supplier || '';
-  document.getElementById('ing-cost').oninput = calculateIngUnitCost;
-  document.getElementById('ing-qty').oninput = calculateIngUnitCost;
   showModal('ingredient-modal');
 }
 function deleteIngredient(id) {
@@ -992,30 +1329,36 @@ function renderIngredients() {
   let list = db.ingredients.filter(i => i.name.toLowerCase().includes(search) && (!cat || i.category === cat));
   const tbody = document.getElementById('ing-table-body');
   const paginationEl = document.getElementById('ing-pagination');
-  if (!list.length) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><h3>No ingredients yet</h3><p>Add ingredients to use them in recipes</p></div></td></tr>`; if (paginationEl) paginationEl.innerHTML = ''; return; }
-  const totalPages = Math.max(1, Math.ceil(list.length / INGREDIENTS_PER_PAGE));
+  if (!list.length) { tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><h3>No ingredients yet</h3><p>Add ingredients to use them in recipes</p></div></td></tr>`; if (paginationEl) paginationEl.innerHTML = ''; return; }
+  const totalPages = Math.max(1, Math.ceil(list.length / ROWS_PER_PAGE));
   if (ingCurrentPage > totalPages) ingCurrentPage = totalPages;
-  const pagedList = list.slice((ingCurrentPage - 1) * INGREDIENTS_PER_PAGE, ingCurrentPage * INGREDIENTS_PER_PAGE);
+  const pagedList = list.slice((ingCurrentPage - 1) * ROWS_PER_PAGE, ingCurrentPage * ROWS_PER_PAGE);
   tbody.innerHTML = pagedList.map(i => {
     const usedIn = db.recipes.filter(r => r.ingredients?.some(x => x.name === i.name)).length;
     return `<tr>
       <td>${i.sku ? `${i.sku} — ` : ''}<span class="td-name">${i.name}</span></td>
       <td><span class="tag tag-purple">${i.category || '—'}</span></td>
-      <td class="td-mono">${i.quantity || 1}</td>
-      <td>${i.unit}</td>
-      <td class="td-mono" style="color:var(--amber)">${cur(i.costPerUnit)}</td>
+      <td>${formatUnitLabel(i.unit)}</td>
+      <td class="td-mono" style="color:var(--acc)">${cur(i.costPerUnit)}</td>
       <td>${i.supplier || '—'}</td>
       <td><span class="tag ${usedIn ? 'tag-green' : 'tag-blue'}">${usedIn} recipe${usedIn !== 1 ? 's' : ''}</span></td>
       <td><div class="td-actions">
-        <button class="action-btn action-edit" onclick="editIngredient('${i.id}')">Edit</button>
-        <button class="action-btn action-del" onclick="deleteIngredient('${i.id}')">Del</button>
+        ${iconBtn('action-edit', `editIngredient('${i.id}')`, 'edit', 'Edit')}
+        ${iconBtn('action-del', `deleteIngredient('${i.id}')`, 'del', 'Delete')}
       </div></td></tr>`;
   }).join('');
   if (paginationEl) {
-    paginationEl.innerHTML = buildPagination(ingCurrentPage, totalPages, 'gotoIngPage', list.length, INGREDIENTS_PER_PAGE, 'ingredients');
+    paginationEl.innerHTML = buildPagination(ingCurrentPage, totalPages, 'gotoIngPage', list.length, ROWS_PER_PAGE, 'ingredients');
   }
 }
-function gotoIngPage(page) { setIngPage(page); renderIngredients(); }
+function gotoIngPage(page) {
+  const search = (document.getElementById('ing-search')?.value || '').toLowerCase();
+  const cat = document.getElementById('ing-filter-cat')?.value || '';
+  const list = db.ingredients.filter(i => i.name.toLowerCase().includes(search) && (!cat || i.category === cat));
+  const totalPages = Math.max(1, Math.ceil(list.length / ROWS_PER_PAGE));
+  ingCurrentPage = Math.min(Math.max(1, page), totalPages);
+  renderIngredients();
+}
 function renderIngCategoryFilter() {
   const cats = [...new Set(db.ingredients.map(i => i.category).filter(Boolean))];
   const sel = document.getElementById('ing-filter-cat'); if (!sel) return;
@@ -1059,21 +1402,39 @@ function deletePackaging(id) {
 }
 function renderPackaging() {
   const tbody = document.getElementById('pkg-table-body');
-  if (!db.packaging.length) { tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><h3>No packaging yet</h3><p>Add packaging materials used in your recipes</p></div></td></tr>`; return; }
-  tbody.innerHTML = db.packaging.map(p => `<tr>
+  const paginationEl = document.getElementById('pkg-pagination');
+  if (!db.packaging.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><h3>No packaging yet</h3><p>Add packaging materials used in your recipes</p></div></td></tr>`;
+    if (paginationEl) paginationEl.innerHTML = '';
+    return;
+  }
+  const totalPages = Math.max(1, Math.ceil(db.packaging.length / ROWS_PER_PAGE));
+  if (pkgCurrentPage > totalPages) pkgCurrentPage = totalPages;
+  const pagedList = db.packaging.slice((pkgCurrentPage - 1) * ROWS_PER_PAGE, pkgCurrentPage * ROWS_PER_PAGE);
+  tbody.innerHTML = pagedList.map(p => `<tr>
     <td>${p.sku ? `${p.sku} — ` : ''}<span class="td-name">${p.name}</span></td>
     <td><span class="tag tag-purple">${p.type || '—'}</span></td>
     <td>${p.unit}</td>
     <td class="td-mono" style="color:var(--amber)">${cur(p.costPerUnit)}</td>
     <td>${p.supplier || '—'}</td>
     <td><div class="td-actions">
-      <button class="action-btn action-edit" onclick="editPackaging('${p.id}')">Edit</button>
-      <button class="action-btn action-del" onclick="deletePackaging('${p.id}')">Del</button>
+      ${iconBtn('action-edit', `editPackaging('${p.id}')`, 'edit', 'Edit')}
+      ${iconBtn('action-del', `deletePackaging('${p.id}')`, 'del', 'Delete')}
     </div></td></tr>`).join('');
+  if (paginationEl) paginationEl.innerHTML = buildPagination(pkgCurrentPage, totalPages, 'setPkgPage', db.packaging.length, ROWS_PER_PAGE, 'items');
+}
+function setPkgPage(page) {
+  const totalPages = Math.max(1, Math.ceil(db.packaging.length / ROWS_PER_PAGE));
+  pkgCurrentPage = Math.min(Math.max(1, page), totalPages);
+  renderPackaging();
 }
 
 // ===== PRICING REPORT =====
-function setPricingPage(page) { pricingCurrentPage = Math.max(1, page); renderPricing(); }
+function setPricingPage(page) {
+  const totalPages = Math.max(1, Math.ceil(db.recipes.length / ROWS_PER_PAGE));
+  pricingCurrentPage = Math.min(Math.max(1, page), totalPages);
+  renderPricing();
+}
 function renderPricing() {
   const tgt = db.settings.targetMargin || 30;
   const tbody = document.getElementById('pricing-table-body');
@@ -1083,17 +1444,17 @@ function renderPricing() {
     if (paginationEl) paginationEl.innerHTML = '';
     return;
   }
-  const totalPages = Math.max(1, Math.ceil(db.recipes.length / PRICING_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(db.recipes.length / ROWS_PER_PAGE));
   if (pricingCurrentPage > totalPages) pricingCurrentPage = totalPages;
-  const startIdx = (pricingCurrentPage - 1) * PRICING_PER_PAGE;
-  const pageRecipes = db.recipes.slice(startIdx, startIdx + PRICING_PER_PAGE);
+  const startIdx = (pricingCurrentPage - 1) * ROWS_PER_PAGE;
+  const pageRecipes = db.recipes.slice(startIdx, startIdx + ROWS_PER_PAGE);
   tbody.innerHTML = pageRecipes.map((r, idx) => {
     const i = startIdx + idx;
     const c = calcRecipeCosts(r);
     const sell = calcSellPrice(r);
     const gross = sell - c.total;
     const margin = calcMargin(r);
-    const sClass = margin >= tgt ? 'tag-green' : margin >= tgt * 0.6 ? 'tag-amber' : 'tag-red';
+    const sClass = getMarginClass(margin, tgt);
     const multiplier = c.total > 0 ? (sell / c.total).toFixed(2) : '—';
     return `<tr>
       <td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:11px">${i + 1}</td>
@@ -1105,12 +1466,12 @@ function renderPricing() {
       <td class="td-mono">—</td>
       <td class="td-mono" style="font-weight:600">${cur(c.total)}</td>
       <td class="td-mono">${multiplier}x</td>
-      <td class="td-mono" style="color:var(--accent);font-weight:600">${cur(sell)}</td>
+      <td class="td-mono sell-price" style="font-weight:600">${cur(sell)}</td>
       <td class="td-mono" style="color:${gross >= 0 ? 'var(--accent)' : 'var(--red)'}">${cur(gross)}</td>
       <td><span class="tag ${sClass}">${margin.toFixed(1)}%</span></td>
       <td><span class="tag ${margin >= tgt ? 'tag-green' : 'tag-red'}">${margin >= tgt ? '✓ Yes' : '✗ No'}</span></td></tr>`;
   }).join('');
-  if (paginationEl) paginationEl.innerHTML = buildPagination(pricingCurrentPage, totalPages, 'setPricingPage', db.recipes.length, PRICING_PER_PAGE, 'recipes');
+  if (paginationEl) paginationEl.innerHTML = buildPagination(pricingCurrentPage, totalPages, 'setPricingPage', db.recipes.length, ROWS_PER_PAGE, 'recipes');
 }
 
 // ===== SETTINGS =====
@@ -1178,16 +1539,15 @@ function handleIngredientUpload(e) {
       const normalizeKey = key => String(key || '').trim().toLowerCase();
       const rows = rawRows.map(raw => {
         const row = {}; Object.keys(raw).forEach(key => row[normalizeKey(key)] = raw[key]);
-        const quantity = parseFloat(row['quantity'] || row['qty'] || 1) || 1;
-        const totalCost = parseFloat(row['unit cost'] || row['unitcost'] || row['cost per unit'] || row['cost'] || 0) || 0;
-        const unit = String(row['unit of measurement'] || row['unit'] || row['uom'] || 'pcs').trim() || 'pcs';
-        return { sku: String(row['sku'] || '').trim(), name: String(row['ingredient name'] || row['ingredient'] || row['name'] || '').trim(), quantity, unit, totalCost, costPerUnit: quantity > 0 ? totalCost / quantity : 0, supplier: String(row['supplier'] || '').trim(), category: String(row['category'] || '').trim() };
+        const unitCost = parseFloat(row['unit cost'] || row['unitcost'] || row['cost per unit'] || row['cost'] || 0) || 0;
+        const unit = normalizeUnit(String(row['unit of measurement'] || row['unit'] || row['uom'] || 'pcs').trim() || 'pcs');
+        return { sku: String(row['sku'] || '').trim(), name: String(row['ingredient name'] || row['ingredient'] || row['name'] || '').trim(), unit, costPerUnit: unitCost, supplier: String(row['supplier'] || '').trim(), category: String(row['category'] || '').trim() };
       }).filter(item => item.name);
       if (!rows.length) { toast('No valid ingredient rows found.', 'red'); return; }
       let added = 0, updated = 0;
       rows.forEach(item => {
         const existing = db.ingredients.find(i => i.name.toLowerCase() === item.name.toLowerCase());
-        if (existing) { Object.assign(existing, { sku: existing.sku || item.sku, category: existing.category || item.category, supplier: existing.supplier || item.supplier, quantity: item.quantity || existing.quantity || 1, unit: item.unit || existing.unit || 'pcs', ...(item.totalCost ? { totalCost: item.totalCost, costPerUnit: item.costPerUnit } : {}) }); updated++; }
+        if (existing) { Object.assign(existing, { sku: existing.sku || item.sku, category: existing.category || item.category, supplier: existing.supplier || item.supplier, unit: item.unit || existing.unit || 'pcs', ...(item.costPerUnit ? { costPerUnit: item.costPerUnit } : {}) }); updated++; }
         else { db.ingredients.push({ id: uid(), ...item }); added++; }
       });
       save(); renderIngredients(); renderIngCategoryFilter(); refreshRecipeNameLists(); updateBadges();
@@ -1784,10 +2144,10 @@ function renderCnPackages() {
         <span class="tag ${marginClass} pkg-card-margin">${t.margin.toFixed(1)}%</span>
       </div>
       <div class="pkg-card-actions" onclick="event.stopPropagation()">
-        <button class="action-btn action-view" onclick="viewCnPackage('${pkg.id}')">View</button>
-        <button class="action-btn action-edit" onclick="editCnPackage('${pkg.id}')">Edit</button>
-        <button class="action-btn action-view" onclick="copyCnPackage('${pkg.id}')">Copy</button>
-        <button class="action-btn action-del" onclick="deleteCnPackage('${pkg.id}')">Del</button>
+        ${iconBtn('action-view', `viewCnPackage('${pkg.id}')`, 'view', 'View')}
+        ${iconBtn('action-edit', `editCnPackage('${pkg.id}')`, 'edit', 'Edit')}
+        ${iconBtn('action-view', `copyCnPackage('${pkg.id}')`, 'copy', 'Copy')}
+        ${iconBtn('action-del', `deleteCnPackage('${pkg.id}')`, 'del', 'Delete')}
       </div>
     </div>`;
   }).join('');
