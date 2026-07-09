@@ -166,13 +166,38 @@ function computeSuggestedSellPrice(costBase, method, pval) {
 }
 
 // ===== DEFAULT PACKAGE TEMPLATES =====
+const PKG_ICONS = {
+  wedding: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="9" cy="9" r="5"/><circle cx="15" cy="15" r="5"/><path d="M9 14l6-6"/></svg>',
+  birthday: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20 21v-8a2 2 0 00-2-2H6a2 2 0 00-2 2v8"/><path d="M4 16s.5-4 8-4 8 4 8 4"/><path d="M12 7V3"/><path d="M8 7h8"/><circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none"/></svg>',
+  corporate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>',
+  fiesta: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>',
+  intimate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>',
+  debut: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+  default: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>'
+};
+function getPkgIconKey(source) {
+  if (source?.icon) return source.icon;
+  const tag = (source?.tag || '').toLowerCase();
+  if (tag.includes('wedding')) return 'wedding';
+  if (tag.includes('debut')) return 'debut';
+  if (tag.includes('birthday') || tag.includes('bday')) return 'birthday';
+  if (tag.includes('corporate') || tag.includes('office')) return 'corporate';
+  if (tag.includes('fiesta') || tag.includes('holiday')) return 'fiesta';
+  if (tag.includes('intimate') || tag.includes('private')) return 'intimate';
+  return 'default';
+}
+function pkgIconHtml(source, extraClass) {
+  const key = getPkgIconKey(source);
+  return `<span class="pkg-banner-icon ${extraClass || ''}" aria-hidden="true">${PKG_ICONS[key] || PKG_ICONS.default}</span>`;
+}
+
 const DEFAULT_TEMPLATES = [
   {
     id: 'tpl-wedding',
     name: 'Wedding Package',
     description: 'Elegant full-course dinner for wedding receptions',
     tag: 'Wedding',
-    emoji: '💍',
+    icon: 'wedding',
     bannerClass: 'banner-wedding',
     pax: 100,
     contingencyPct: 8,
@@ -191,7 +216,7 @@ const DEFAULT_TEMPLATES = [
     name: 'Birthday Celebration',
     description: 'Fun and festive buffet spread for birthday parties',
     tag: 'Birthday',
-    emoji: '🎂',
+    icon: 'birthday',
     bannerClass: 'banner-birthday',
     pax: 50,
     contingencyPct: 5,
@@ -210,7 +235,7 @@ const DEFAULT_TEMPLATES = [
     name: 'Corporate Lunch',
     description: 'Professional lunch setup for corporate meetings and events',
     tag: 'Corporate',
-    emoji: '🏢',
+    icon: 'corporate',
     bannerClass: 'banner-corporate',
     pax: 30,
     contingencyPct: 5,
@@ -229,7 +254,7 @@ const DEFAULT_TEMPLATES = [
     name: 'Fiesta Package',
     description: 'Traditional Filipino fiesta with classic dishes',
     tag: 'Fiesta',
-    emoji: '🥳',
+    icon: 'fiesta',
     bannerClass: 'banner-fiesta',
     pax: 150,
     contingencyPct: 10,
@@ -248,7 +273,7 @@ const DEFAULT_TEMPLATES = [
     name: 'Intimate Gathering',
     description: 'Curated menu for small, intimate celebrations',
     tag: 'Private',
-    emoji: '🕯️',
+    icon: 'intimate',
     bannerClass: 'banner-intimate',
     pax: 20,
     contingencyPct: 5,
@@ -267,8 +292,8 @@ const DEFAULT_TEMPLATES = [
     name: 'Debut Package',
     description: '18 roses, 18 candles, full-course dinner for debut',
     tag: 'Debut',
-    emoji: '🌹',
-    bannerClass: 'banner-wedding',
+    icon: 'debut',
+    bannerClass: 'banner-debut',
     pax: 80,
     contingencyPct: 8,
     wastePct: 4,
@@ -1743,17 +1768,7 @@ function handlePkgImageUpload(e) {
   };
   reader.readAsDataURL(file); e.target.value = '';
 }
-function updateEmojiPreview() {
-  const emoji = document.getElementById('cn-pkg-emoji').value;
-  if (emoji) {
-    const img = document.getElementById('pkg-img-preview');
-    const placeholder = document.getElementById('pkg-img-placeholder');
-    if (!currentPkgImageData) {
-      img.style.display = 'none';
-      placeholder.style.display = 'flex';
-    }
-  }
-}
+function updateEmojiPreview() { /* removed — icons derived from package tag */ }
 
 // ===== CN PACKAGE CALCULATIONS =====
 function calcCnPackageTotals(pkg) {
@@ -1787,7 +1802,7 @@ function resetCnPackageModal() {
   if (titleEl) titleEl.textContent = 'New Package';
   const fields = [
     { id: 'cn-pkg-name', value: '' }, { id: 'cn-pkg-desc', value: '' }, { id: 'cn-pkg-tag', value: '' },
-    { id: 'cn-pkg-emoji', value: '' }, { id: 'cn-pkg-pax', value: 50 },
+    { id: 'cn-pkg-pax', value: 50 },
     { id: 'cn-pkg-contingency', value: 5 }, { id: 'cn-pkg-waste', value: 3 },
     { id: 'cn-pkg-production', value: 10 }, { id: 'cn-pkg-capex', value: 30 },
     { id: 'cn-pkg-venue', value: '' }, { id: 'cn-pkg-venue-cost', value: 0 },
@@ -1934,7 +1949,7 @@ function saveCnPackage() {
     name,
     description: document.getElementById('cn-pkg-desc')?.value?.trim() || '',
     tag: document.getElementById('cn-pkg-tag')?.value?.trim() || '',
-    emoji: document.getElementById('cn-pkg-emoji')?.value?.trim() || '',
+    icon: getPkgIconKey({ tag: document.getElementById('cn-pkg-tag')?.value?.trim() || '' }),
     image: currentPkgImageData || null,
     pax: parseFloat(document.getElementById('cn-pkg-pax')?.value) || 1,
     contingencyPct: parseFloat(document.getElementById('cn-pkg-contingency')?.value) || 0,
@@ -1976,7 +1991,6 @@ function editCnPackage(id) {
     { id: 'cn-pkg-name', value: pkg.name },
     { id: 'cn-pkg-desc', value: pkg.description ?? '' },
     { id: 'cn-pkg-tag', value: pkg.tag ?? '' },
-    { id: 'cn-pkg-emoji', value: pkg.emoji ?? '' },
     { id: 'cn-pkg-pax', value: pkg.pax ?? 50 },
     { id: 'cn-pkg-contingency', value: pkg.contingencyPct ?? 5 },
     { id: 'cn-pkg-waste', value: pkg.wastePct ?? 3 },
@@ -2039,7 +2053,6 @@ function copyCnPackage(id) {
     { id: 'cn-pkg-name', value: 'Copy of ' + pkg.name },
     { id: 'cn-pkg-desc', value: pkg.description ?? '' },
     { id: 'cn-pkg-tag', value: pkg.tag ?? '' },
-    { id: 'cn-pkg-emoji', value: pkg.emoji ?? '' },
     { id: 'cn-pkg-pax', value: pkg.pax ?? 50 },
     { id: 'cn-pkg-contingency', value: pkg.contingencyPct ?? 5 },
     { id: 'cn-pkg-waste', value: pkg.wastePct ?? 3 },
@@ -2073,19 +2086,20 @@ function showDefaultTemplates() {
   grid.innerHTML = DEFAULT_TEMPLATES.map(tpl => `
     <div class="template-card" onclick="useTemplate('${tpl.id}')">
       <div class="template-card-banner ${tpl.bannerClass}">
-        <span style="font-size:52px">${tpl.emoji}</span>
+        ${pkgIconHtml(tpl, 'pkg-banner-icon--template')}
+        <span class="template-card-banner-label">${tpl.tag}</span>
       </div>
       <div class="template-card-body">
         <div class="template-card-name">${tpl.name}</div>
         <div class="template-card-desc">${tpl.description}</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <span class="tag tag-amber" style="font-size:10px">${tpl.tag}</span>
-          <span class="tag tag-blue" style="font-size:10px">${tpl.pax} pax default</span>
+        <div class="template-card-chips">
+          <span class="template-chip template-chip--pax">${tpl.pax} pax</span>
+          <span class="template-chip">${tpl.pricingMethod === 'margin' ? 'Margin' : 'Markup'} ${tpl.pricingValue}%</span>
         </div>
       </div>
       <div class="template-card-footer">
-        <span>Markup: ${tpl.pricingValue}%</span>
-        <span style="color:var(--accent);font-weight:600;font-size:12px">Use Template →</span>
+        <span class="template-card-meta">Venue est. ${cur(tpl.venueCost)}</span>
+        <span class="template-card-action">Use template</span>
       </div>
     </div>`).join('');
   showModal('default-templates-modal');
@@ -2101,7 +2115,6 @@ function useTemplate(tplId) {
     { id: 'cn-pkg-name', value: tpl.name },
     { id: 'cn-pkg-desc', value: tpl.description },
     { id: 'cn-pkg-tag', value: tpl.tag },
-    { id: 'cn-pkg-emoji', value: tpl.emoji },
     { id: 'cn-pkg-pax', value: tpl.pax },
     { id: 'cn-pkg-contingency', value: tpl.contingencyPct },
     { id: 'cn-pkg-waste', value: tpl.wastePct },
@@ -2141,8 +2154,7 @@ function viewCnPackage(id) {
 
   // Update banner
   const banner = document.getElementById('view-pkg-banner');
-  const emojiEl = document.getElementById('view-pkg-emoji-large');
-  emojiEl.textContent = pkg.emoji || '🍽️';
+  banner.className = `view-pkg-banner-inner ${getBannerClass(pkg)}${pkg.image ? ' view-pkg-banner--image' : ''}`;
 
   if (pkg.image) {
     let heroImg = banner.querySelector('.pkg-hero-img');
@@ -2151,7 +2163,16 @@ function viewCnPackage(id) {
   } else {
     const heroImg = banner.querySelector('.pkg-hero-img');
     if (heroImg) heroImg.remove();
+    let iconEl = banner.querySelector('.view-pkg-banner-icon');
+    if (!iconEl) {
+      iconEl = document.createElement('div');
+      iconEl.className = 'view-pkg-banner-icon';
+      banner.appendChild(iconEl);
+    }
+    iconEl.innerHTML = pkgIconHtml(pkg, 'pkg-banner-icon--view');
   }
+  const staleIcon = banner.querySelector('.view-pkg-banner-icon');
+  if (pkg.image && staleIcon) staleIcon.remove();
 
   // Tag badge
   const tagEl = document.getElementById('view-pkg-tag-badge');
@@ -2240,6 +2261,20 @@ function viewCnPackage(id) {
 }
 
 // ===== RENDER CN PACKAGES (Cards) =====
+function renderCnPageStats(list) {
+  const el = document.getElementById('cn-page-stats');
+  if (!el) return;
+  const upcoming = list.filter(p => p.eventDate && new Date(p.eventDate + 'T' + (p.eventTime || '00:00')) > new Date()).length;
+  const margins = list.map(p => calcCnPackageTotals(p).margin);
+  const avgMargin = margins.length ? margins.reduce((a, b) => a + b, 0) / margins.length : 0;
+  const totalValue = list.reduce((s, p) => s + calcCnPackageTotals(p).sellingPriceInclVat, 0);
+  el.innerHTML = `
+    <div class="cn-stat-pill"><span class="cn-stat-val">${list.length}</span><span class="cn-stat-label">Packages</span></div>
+    <div class="cn-stat-pill cn-stat-pill--blue"><span class="cn-stat-val">${upcoming}</span><span class="cn-stat-label">Upcoming</span></div>
+    <div class="cn-stat-pill cn-stat-pill--green"><span class="cn-stat-val">${avgMargin.toFixed(1)}%</span><span class="cn-stat-label">Avg Margin</span></div>
+    <div class="cn-stat-pill"><span class="cn-stat-val">${cur(totalValue)}</span><span class="cn-stat-label">Portfolio Value</span></div>`;
+}
+
 function renderCnPackages() {
   const grid = document.getElementById('cn-package-cards');
   if (!grid) return;
@@ -2253,17 +2288,19 @@ function renderCnPackages() {
 
   if (!list.length) {
     grid.innerHTML = `<div class="pkg-empty-state">
-      <div class="big-icon">📦</div>
+      <div class="pkg-empty-icon" aria-hidden="true">${PKG_ICONS.default}</div>
       <h3>No packages yet</h3>
-      <p>Create your first package or start from a template</p>
-      <div style="display:flex;gap:10px;justify-content:center;margin-top:8px">
+      <p>Create your first catering package or start from a professional template</p>
+      <div class="pkg-empty-actions">
         <button class="btn btn-ghost" onclick="showDefaultTemplates()">Browse Templates</button>
-        <button class="btn btn-primary" onclick="showModal('cn-package-modal')">+ New Package</button>
+        <button class="btn btn-primary" onclick="showModal('cn-package-modal')">New Package</button>
       </div>
     </div>`;
+    renderCnPageStats([]);
     return;
   }
 
+  renderCnPageStats(list);
   grid.innerHTML = list.map(pkg => {
     const t = calcCnPackageTotals(pkg);
     const marginClass = t.margin >= 30 ? 'tag-green' : t.margin >= 18 ? 'tag-amber' : 'tag-red';
@@ -2271,18 +2308,22 @@ function renderCnPackages() {
 
     let bannerHtml = '';
     if (pkg.image) {
-      bannerHtml = `<img src="${pkg.image}" class="pkg-card-img" alt="${pkg.name}">`;
+      bannerHtml = `<div class="pkg-card-banner-wrap">
+        <img src="${pkg.image}" class="pkg-card-img" alt="${pkg.name}">
+        <div class="pkg-card-banner-overlay"></div>
+      </div>`;
     } else {
       bannerHtml = `<div class="pkg-card-banner ${bannerClass}">
-        <span>${pkg.emoji || '🍽️'}</span>
+        ${pkgIconHtml(pkg)}
+        <div class="pkg-card-banner-overlay"></div>
       </div>`;
     }
 
     const isUpcoming = pkg.eventDate && new Date(pkg.eventDate + 'T' + (pkg.eventTime || '00:00')) > new Date();
-    const eventBadge = isUpcoming ? `<div style="position:absolute;top:12px;right:12px;background:var(--blue);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;z-index:2">Upcoming</div>` : '';
+    const eventBadge = isUpcoming ? `<span class="pkg-card-badge">Upcoming</span>` : '';
 
     return `<div class="pkg-card" onclick="viewCnPackage('${pkg.id}')">
-      <div style="position:relative">
+      <div class="pkg-card-media">
         ${bannerHtml}
         ${eventBadge}
       </div>
@@ -2296,8 +2337,8 @@ function renderCnPackages() {
             ${pkg.pax || 1} pax
           </div>
           <div class="pkg-card-meta-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>
-            ${(pkg.recipes || []).length} dish${(pkg.recipes || []).length !== 1 ? 'es' : ''}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+            ${(pkg.recipes || []).length} recipe${(pkg.recipes || []).length !== 1 ? 's' : ''}
           </div>
           ${pkg.eventDate ? `<div class="pkg-card-meta-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -2324,11 +2365,12 @@ function renderCnPackages() {
 
 function getBannerClass(pkg) {
   const tag = (pkg.tag || '').toLowerCase();
-  if (tag.includes('wedding') || tag.includes('debut')) return 'banner-wedding';
-  if (tag.includes('birthday') || tag.includes('bday')) return 'banner-birthday';
-  if (tag.includes('corporate') || tag.includes('office')) return 'banner-corporate';
-  if (tag.includes('fiesta') || tag.includes('holiday')) return 'banner-fiesta';
-  if (tag.includes('intimate') || tag.includes('private')) return 'banner-intimate';
+  if (pkg.icon === 'debut' || tag.includes('debut')) return 'banner-debut';
+  if (pkg.icon === 'wedding' || tag.includes('wedding')) return 'banner-wedding';
+  if (pkg.icon === 'birthday' || tag.includes('birthday') || tag.includes('bday')) return 'banner-birthday';
+  if (pkg.icon === 'corporate' || tag.includes('corporate') || tag.includes('office')) return 'banner-corporate';
+  if (pkg.icon === 'fiesta' || tag.includes('fiesta') || tag.includes('holiday')) return 'banner-fiesta';
+  if (pkg.icon === 'intimate' || tag.includes('intimate') || tag.includes('private')) return 'banner-intimate';
   return 'banner-default';
 }
 

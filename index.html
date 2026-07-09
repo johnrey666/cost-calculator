@@ -538,8 +538,9 @@
           </button>
         </div>
       </div>
-      <div style="padding:24px 28px">
-        <div class="toolbar" style="margin-bottom:20px">
+      <div class="cn-page">
+
+        <div class="cn-toolbar card card-infographic">
           <div class="search-box">
             <span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
             <input type="text" placeholder="Search packages..." id="cn-search" oninput="renderCnPackages()">
@@ -900,7 +901,6 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;color:var(--text4);margin:0 auto 8px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
               <div style="font-size:11px;color:var(--text4);font-weight:500">Click to upload</div>
             </div>
-            <input type="text" id="cn-pkg-emoji" placeholder="" style="position:absolute;top:8px;left:8px;width:calc(100% - 16px);text-align:center;font-size:24px;background:rgba(255,255,255,0.9);border:none;border-radius:4px;padding:4px" oninput="updateEmojiPreview()" maxlength="4">
           </div>
         </div>
         <div class="form-grid-2">
@@ -1027,13 +1027,16 @@
 
 <!-- DEFAULT TEMPLATES MODAL -->
 <div class="modal-overlay" id="default-templates-modal">
-  <div class="modal" style="max-width:920px">
+  <div class="modal modal--templates">
     <div class="modal-header">
-      <div class="modal-title">Default Package Templates</div>
+      <div>
+        <div class="modal-title">Package Templates</div>
+        <div class="modal-subtitle">Pre-configured starting points for common event types</div>
+      </div>
       <button class="modal-close" onclick="closeModal('default-templates-modal')">✕</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:12.5px;color:var(--text3);margin-bottom:20px;line-height:1.5">Choose a template as a starting point. All details, recipes, and pricing are fully customizable before saving.</p>
+      <p class="templates-intro">Select a template to pre-fill pricing, pax defaults, and event settings. All fields remain fully editable before saving.</p>
       <div class="templates-grid" id="templates-grid"></div>
     </div>
   </div>
@@ -1041,16 +1044,15 @@
 
 <!-- VIEW CN PACKAGE MODAL -->
 <div class="modal-overlay" id="view-cn-package-modal">
-  <div class="modal" style="max-width:800px">
-    <div class="modal-header" id="view-pkg-header" style="position:relative;padding:0;overflow:hidden;border-radius:var(--r3) var(--r3) 0 0;min-height:160px;border-bottom:none">
-      <div id="view-pkg-banner" style="width:100%;min-height:160px;display:flex;align-items:flex-end;padding:22px 24px;background:linear-gradient(135deg,var(--surface2),var(--surface3));position:relative">
-        <div id="view-pkg-emoji-large" style="position:absolute;right:26px;top:50%;transform:translateY(-50%);font-size:68px;opacity:.3"></div>
-        <div style="position:relative;z-index:1">
-          <div id="view-pkg-tag-badge" style="margin-bottom:8px"></div>
-          <div class="modal-title" id="view-cn-package-title" style="font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.4px">Package Details</div>
-          <div id="view-pkg-desc" style="font-size:12.5px;color:var(--text3);margin-top:5px"></div>
+  <div class="modal modal--view-pkg">
+    <div class="modal-header view-pkg-header" id="view-pkg-header">
+      <div id="view-pkg-banner" class="view-pkg-banner-inner banner-default">
+        <div class="view-pkg-banner-content">
+          <div id="view-pkg-tag-badge"></div>
+          <div class="modal-title" id="view-cn-package-title">Package Details</div>
+          <div id="view-pkg-desc" class="view-pkg-desc"></div>
         </div>
-        <button class="modal-close" onclick="closeModal('view-cn-package-modal')" style="position:absolute;top:14px;right:14px">✕</button>
+        <button class="modal-close view-pkg-close" onclick="closeModal('view-cn-package-modal')">✕</button>
       </div>
     </div>
     <div class="modal-body" id="view-cn-package-body"></div>
