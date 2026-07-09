@@ -456,6 +456,18 @@ function updateThemeButton() {
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 // ===== NAV =====
+function toggleSidebar() {
+  const sidebar = document.getElementById('app-sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  const open = sidebar.classList.toggle('open');
+  if (backdrop) backdrop.classList.toggle('show', open);
+}
+function closeSidebar() {
+  const sidebar = document.getElementById('app-sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (sidebar) sidebar.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('show');
+}
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -463,6 +475,7 @@ function showPage(id) {
   document.querySelectorAll('.nav-item').forEach(n => {
     if (n.getAttribute('onclick') === `showPage('${id}')`) n.classList.add('active');
   });
+  closeSidebar();
   if (id === 'dashboard') renderDashboard();
   if (id === 'recipes') { renderRecipes(); renderRecipeCategoryFilter(); }
   if (id === 'ingredients') { renderIngredients(); renderIngCategoryFilter(); }
@@ -481,6 +494,7 @@ function updateBadges() {
 
 // ===== MODALS =====
 function showModal(id) {
+  closeSidebar();
   document.getElementById(id).classList.add('open');
   if (id === 'recipe-modal' && !editingRecipeId) resetRecipeModal();
   if (id === 'cn-package-modal' && !editingCnPackageId) resetCnPackageModal();

@@ -32,8 +32,15 @@
 
 <div class="app" id="main-app" style="display:none">
 
+  <!-- ─── MOBILE MENU TOGGLE ──────────────────────────────────────────── -->
+  <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
+
   <!-- ─── SIDEBAR ─────────────────────────────────────────────────────── -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="app-sidebar">
+    <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close menu">✕</button>
     <div class="sidebar-logo">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
         <div style="width:26px;height:26px;background:var(--acc-soft);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
