@@ -1208,18 +1208,20 @@ function renderRecipeCategoryFilter() {
 }
 
 // ===== DASHBOARD INFOGRAPHIC HELPERS =====
-function renderInfographicBar(name, value, pct, color, rank, gradient) {
-  const grad = gradient || `linear-gradient(90deg, ${color}, ${color}88)`;
+function renderInfographicBar(name, value, pct, valClass, rank, fillClass) {
   const rankStr = String(rank).padStart(2, '0');
+  const rankCls = rank <= 3 ? `infographic-rank--top infographic-rank--${rank}` : '';
+  const fillCls = fillClass || 'infographic-bar-fill--blue';
+  const valCls = valClass || 'infographic-bar-val--blue';
   return `<div class="infographic-bar-item">
-    <span class="infographic-rank">${rankStr}</span>
+    <span class="infographic-rank ${rankCls}">${rankStr}</span>
     <div class="infographic-bar-content">
       <div class="infographic-bar-top">
         <span class="infographic-bar-name" title="${name}">${name}</span>
-        <span class="infographic-bar-val" style="color:${color}">${value}</span>
+        <span class="infographic-bar-val ${valCls}">${value}</span>
       </div>
       <div class="infographic-bar-track">
-        <div class="infographic-bar-fill" style="width:${Math.min(100, Math.max(0, pct)).toFixed(1)}%;background:${grad}"></div>
+        <div class="infographic-bar-fill ${fillCls}" style="width:${Math.min(100, Math.max(0, pct)).toFixed(1)}%"></div>
       </div>
     </div>
   </div>`;
@@ -1247,16 +1249,29 @@ function renderDashHealthBanner(costs, tgt) {
   const amber = costs.filter(x => x.margin >= tgt * 0.6 && x.margin < tgt).length;
   const red = costs.filter(x => x.margin < tgt * 0.6).length;
   const total = costs.length;
+  const pctOnTarget = Math.round(green / total * 100);
   const pG = (green / total * 100).toFixed(1);
   const pA = (amber / total * 100).toFixed(1);
   const pR = (red / total * 100).toFixed(1);
+  const ringR = 18, ringC = 2 * Math.PI * ringR;
+  const ringOffset = ringC * (1 - pctOnTarget / 100);
   el.innerHTML = `
     <div class="health-banner-header">
       <div class="health-banner-title">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         Margin Health Score
       </div>
-      <div class="health-banner-score">${Math.round(green / total * 100)}<span>% on target</span></div>
+      <div class="health-banner-score-wrap">
+        <div class="health-banner-ring" aria-hidden="true">
+          <svg viewBox="0 0 44 44">
+            <circle class="health-banner-ring-track" cx="22" cy="22" r="${ringR}"/>
+            <circle class="health-banner-ring-fill" cx="22" cy="22" r="${ringR}"
+              stroke-dasharray="${ringC.toFixed(2)}"
+              stroke-dashoffset="${ringOffset.toFixed(2)}"/>
+          </svg>
+        </div>
+        <div class="health-banner-score">${pctOnTarget}<span>% on target</span></div>
+      </div>
     </div>
     <div class="health-banner-bar">
       ${green ? `<div class="health-seg health-seg--green" style="width:${pG}%" title="${green} on target"><span>${green}</span></div>` : ''}
@@ -1268,6 +1283,65 @@ function renderDashHealthBanner(costs, tgt) {
       <span class="health-legend-item"><i class="health-dot health-dot--amber"></i>Near target (${amber})</span>
       <span class="health-legend-item"><i class="health-dot health-dot--red"></i>Below target (${red})</span>
     </div>`;
+}
+function renderDashQuickInsights(costs, tgt) {
+  const el = document.getElementById('dash-quick-insights');
+  if (!el) return;
+  if (!costs.length) { el.innerHTML = ''; return; }
+  const below = costs.filter(x => x.margin < tgt).length;
+  const avgCost = costs.reduce((s, x) => s + x.c.total, 0) / costs.length;
+  const avgSell = costs.reduce((s, x) => s + x.sell, 0) / costs.length;
+  const cats = {};
+  costs.forEach(x => {
+    const c = x.r.category || 'Uncategorized';
+    if (!cats[c]) cats[c] = { sum: 0, n: 0 };
+    cats[c].sum += x.margin; cats[c].n++;
+  });
+  const bestCat = Object.entries(cats).sort((a, b) => b[1].sum / b[1].n - a[1].sum / a[1].n)[0];
+  const bestCatName = bestCat ? bestCat[0] : '—';
+  const bestCatMargin = bestCat ? (bestCat[1].sum / bestCat[1].n).toFixed(1) + '%' : '—';
+  const iconCost = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>';
+  const iconSell = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>';
+  const iconAlert = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+  const iconCat = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>';
+  el.innerHTML = `
+    <div class="dash-insight dash-insight--blue">
+      <div class="dash-insight-icon">${iconCost}</div>
+      <div class="dash-insight-body"><div class="dash-insight-val">${cur(avgCost)}</div><div class="dash-insight-label">Avg cost per recipe</div></div>
+    </div>
+    <div class="dash-insight dash-insight--green">
+      <div class="dash-insight-icon">${iconSell}</div>
+      <div class="dash-insight-body"><div class="dash-insight-val">${cur(avgSell)}</div><div class="dash-insight-label">Avg sell price</div></div>
+    </div>
+    <div class="dash-insight dash-insight--${below ? 'red' : 'green'}">
+      <div class="dash-insight-icon">${iconAlert}</div>
+      <div class="dash-insight-body"><div class="dash-insight-val">${below}</div><div class="dash-insight-label">Recipes below target</div></div>
+    </div>
+    <div class="dash-insight dash-insight--amber">
+      <div class="dash-insight-icon">${iconCat}</div>
+      <div class="dash-insight-body"><div class="dash-insight-val" title="${bestCatName}">${bestCatName}</div><div class="dash-insight-label">Top category · ${bestCatMargin} avg</div></div>
+    </div>`;
+}
+function renderStatCardMeters(costs, tgt) {
+  document.querySelectorAll('.stat-card-meter').forEach(m => m.remove());
+  if (!costs.length) return;
+  const sorted = [...costs].sort((a, b) => b.margin - a.margin);
+  const high = sorted[0], low = sorted[sorted.length - 1];
+  const highCard = document.getElementById('dash-highest-profit')?.closest('.stat-card-body');
+  const lowCard = document.getElementById('dash-lowest-profit')?.closest('.stat-card-body');
+  if (highCard) {
+    const m = document.createElement('div');
+    m.className = 'stat-card-meter';
+    m.innerHTML = `<div class="stat-card-meter-fill" style="width:${Math.min(100, Math.max(0, high.margin))}%;background:var(--green-dark)"></div>`;
+    highCard.appendChild(m);
+  }
+  if (lowCard) {
+    const m = document.createElement('div');
+    m.className = 'stat-card-meter';
+    const color = low.margin >= tgt ? 'var(--green-dark)' : low.margin >= tgt * 0.6 ? 'var(--amber)' : 'var(--red)';
+    m.innerHTML = `<div class="stat-card-meter-fill" style="width:${Math.min(100, Math.max(0, low.margin))}%;background:${color}"></div>`;
+    lowCard.appendChild(m);
+  }
 }
 
 // ===== DASHBOARD =====
@@ -1295,17 +1369,19 @@ function renderDashboard() {
   const topCosts = [...costs].sort((a, b) => b.c.total - a.c.total).slice(0, 8);
   const maxCost = topCosts[0]?.c.total || 1;
   document.getElementById('dash-top-recipes').innerHTML = topCosts.length ? topCosts.map((x, i) =>
-    renderInfographicBar(x.r.name, cur(x.c.total), x.c.total / maxCost * 100, 'var(--blue)', i + 1, 'linear-gradient(90deg, #1d5fd4, #4f8ef7)')
+    renderInfographicBar(x.r.name, cur(x.c.total), x.c.total / maxCost * 100, 'infographic-bar-val--blue', i + 1, 'infographic-bar-fill--blue')
   ).join('') : '<div class="infographic-empty">No recipes yet — add your first recipe to see cost rankings</div>';
   const marginList = [...costs].sort((a, b) => b.margin - a.margin).slice(0, 8);
   document.getElementById('dash-margin-list').innerHTML = marginList.length ? marginList.map((x, i) => {
-    const color = x.margin >= tgt ? 'var(--green-dark)' : x.margin >= tgt * 0.6 ? 'var(--amber)' : 'var(--red)';
-    const grad = x.margin >= tgt ? 'linear-gradient(90deg, #0a6847, #12b86a)' : x.margin >= tgt * 0.6 ? 'linear-gradient(90deg, #c97a08, #e8a020)' : 'linear-gradient(90deg, #d92d20, #f05246)';
-    return renderInfographicBar(x.r.name, x.margin.toFixed(1) + '%', Math.min(100, Math.max(0, x.margin)), color, i + 1, grad);
+    const valCls = x.margin >= tgt ? 'infographic-bar-val--green' : x.margin >= tgt * 0.6 ? 'infographic-bar-val--amber' : 'infographic-bar-val--red';
+    const fillCls = x.margin >= tgt ? 'infographic-bar-fill--green' : x.margin >= tgt * 0.6 ? 'infographic-bar-fill--amber' : 'infographic-bar-fill--red';
+    return renderInfographicBar(x.r.name, x.margin.toFixed(1) + '%', Math.min(100, Math.max(0, x.margin)), valCls, i + 1, fillCls);
   }).join('') : '<div class="infographic-empty">No recipes yet — margins will appear here</div>';
 
   renderDashHeroPills(costs, tgt);
   renderDashHealthBanner(costs, tgt);
+  renderDashQuickInsights(costs, tgt);
+  renderStatCardMeters(costs, tgt);
 
   // ── Donut: Margin Health ──
   const healthGreen = costs.filter(x => x.margin >= tgt).length;
@@ -1316,6 +1392,8 @@ function renderDashboard() {
     { label: 'Near target', value: healthAmber, color: 'var(--amber)' },
     { label: 'Below target', value: healthRed, color: 'var(--red)' }
   ], costs.length, costs.length === 1 ? 'Recipe' : 'Recipes');
+  const marginEl = document.getElementById('dash-margin-health');
+  if (marginEl) marginEl.classList.add('donut-wrap--dash');
 
   // ── Donut: Cost Composition ──
   const totIng = costs.reduce((s, x) => s + x.c.ingCost, 0);
@@ -1326,6 +1404,8 @@ function renderDashboard() {
     { label: 'Packaging', value: totPkg, color: 'var(--purple)', display: cur(totPkg) },
     { label: 'VAT', value: totVat, color: 'var(--amber)', display: cur(totVat) }
   ], compactCur(totIng + totPkg + totVat), 'Total');
+  const costEl = document.getElementById('dash-cost-composition');
+  if (costEl) costEl.classList.add('donut-wrap--dash');
 
   const search = (document.getElementById('dash-search')?.value || '').toLowerCase().trim();
   const filtered = costs.filter(x => !search || x.r.name.toLowerCase().includes(search) || (x.r.category || '').toLowerCase().includes(search));
@@ -1341,7 +1421,8 @@ function renderDashboard() {
       const statusIcon = x.margin >= tgt
         ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:10px;height:10px"><polyline points="20 6 9 17 4 12"/></svg>'
         : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:10px;height:10px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-      return `<tr>
+      const rowCls = x.margin >= tgt ? 'dash-row--green' : x.margin >= tgt * 0.6 ? 'dash-row--amber' : 'dash-row--red';
+      return `<tr class="${rowCls}">
         <td class="td-name">${x.r.name}</td>
         <td><span class="tag tag-blue">${x.r.category || '—'}</span></td>
         <td>${x.r.batch} ${x.r.unit || 'pcs'}</td>
