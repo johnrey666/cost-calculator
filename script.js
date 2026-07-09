@@ -327,6 +327,7 @@ let db = {
 };
 const ROWS_PER_PAGE = 5;
 let dashCurrentPage = 1;
+let dashChartSeries = { sell: true, cost: true, margin: true };
 let ingCurrentPage = 1;
 let recipeCurrentPage = 1;
 let pricingCurrentPage = 1;
@@ -666,6 +667,30 @@ function migrateRecipePrices() {
   });
   return changed;
 }
+function getRecipeHistorySnapshot(recipe, date) {
+  const costs = calcRecipeCosts(recipe);
+  const sell = calcSellPrice(recipe);
+  return {
+    date: date || Date.now(),
+    price: sell,
+    totalCost: costs.total,
+    margin: calcMargin(recipe)
+  };
+}
+function appendRecipeHistorySnapshot(history, recipe, date) {
+  const list = Array.isArray(history) ? [...history] : [];
+  const snap = getRecipeHistorySnapshot(recipe, date);
+  if (!snap.price || snap.price <= 0) return list;
+  const last = list[list.length - 1];
+  if (last) {
+    const priceSame = Math.abs((last.price || 0) - snap.price) < 0.009;
+    const costSame = Math.abs((last.totalCost ?? 0) - snap.totalCost) < 0.009;
+    const marginSame = Math.abs((last.margin ?? 0) - snap.margin) < 0.09;
+    if (priceSame && costSame && marginSame) return list;
+  }
+  list.push(snap);
+  return list;
+}
 function appendPriceHistory(history, price, date) {
   const list = Array.isArray(history) ? [...history] : [];
   const p = parseFloat(price);
@@ -675,6 +700,18 @@ function appendPriceHistory(history, price, date) {
   list.push({ date: date || Date.now(), price: p });
   return list;
 }
+function enrichHistoryEntry(entry, recipe) {
+  const e = { ...entry };
+  const snapPrice = e.price || calcSellPrice(recipe);
+  if (e.totalCost == null) e.totalCost = calcRecipeCosts(recipe).total;
+  if (e.margin == null && snapPrice > 0) {
+    const { baseCost } = calcRecipeCosts(recipe);
+    e.margin = ((snapPrice - baseCost) / snapPrice) * 100;
+  } else if (e.margin == null) {
+    e.margin = 0;
+  }
+  return e;
+}
 function migratePriceHistory() {
   let changed = false;
   (db.recipes || []).forEach(r => {
@@ -682,11 +719,17 @@ function migratePriceHistory() {
     if (r.priceHistory.length === 0 && r.sellPrice > 0) {
       const entries = [];
       if (r.lastSellPrice > 0 && Math.abs(r.lastSellPrice - r.sellPrice) > 0.009) {
-        entries.push({ date: Date.now() - 7 * 86400000, price: r.lastSellPrice });
+        entries.push(enrichHistoryEntry({ date: Date.now() - 7 * 86400000, price: r.lastSellPrice }, r));
       }
-      entries.push({ date: Date.now(), price: r.sellPrice });
+      entries.push(enrichHistoryEntry({ date: Date.now(), price: r.sellPrice }, r));
       r.priceHistory = entries;
       changed = true;
+    } else {
+      r.priceHistory = r.priceHistory.map(entry => {
+        const enriched = enrichHistoryEntry(entry, r);
+        if (enriched.totalCost !== entry.totalCost || enriched.margin !== entry.margin) changed = true;
+        return enriched;
+      });
     }
   });
   return changed;
@@ -697,62 +740,144 @@ function formatChartDate(ts) {
 function formatChartDateShort(ts) {
   return new Date(ts).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
 }
-function renderPriceLineChart(el, history, recipeName) {
+function toggleDashChartSeries(key) {
+  if (!dashChartSeries.hasOwnProperty(key)) return;
+  const visibleCount = Object.values(dashChartSeries).filter(Boolean).length;
+  if (dashChartSeries[key] && visibleCount <= 1) return;
+  dashChartSeries[key] = !dashChartSeries[key];
+  renderDashPriceChart();
+}
+function renderPriceLineChart(el, history, recipeName, series, recipe) {
+  series = series || dashChartSeries;
   if (!el || !history.length) return;
-  const sorted = [...history].sort((a, b) => a.date - b.date);
-  const w = 720, h = 220;
-  const pad = { top: 24, right: 28, bottom: 44, left: 62 };
+  const sorted = [...history].map(e => enrichHistoryEntry(e, recipe)).sort((a, b) => a.date - b.date);
+  const w = 720, h = 240;
+  const pad = { top: 24, right: 56, bottom: 44, left: 62 };
   const chartW = w - pad.left - pad.right;
   const chartH = h - pad.top - pad.bottom;
-  const prices = sorted.map(p => p.price);
-  const minP = Math.min(...prices);
-  const maxP = Math.max(...prices);
-  const rangeP = maxP - minP || maxP * 0.15 || 10;
-  const yMin = Math.max(0, minP - rangeP * 0.12);
-  const yMax = maxP + rangeP * 0.12;
-  const ySpan = yMax - yMin || 1;
   const n = sorted.length;
   const toX = i => pad.left + (n === 1 ? chartW / 2 : (i / (n - 1)) * chartW);
-  const toY = price => pad.top + chartH - ((price - yMin) / ySpan) * chartH;
-  const points = sorted.map((p, i) => ({ x: toX(i), y: toY(p.price), ...p }));
-  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+  const leftVals = [];
+  if (series.sell) sorted.forEach(p => leftVals.push(p.price));
+  if (series.cost) sorted.forEach(p => leftVals.push(p.totalCost));
+  const marginVals = series.margin ? sorted.map(p => p.margin) : [];
+
+  const hasLeft = leftVals.length > 0;
+  const hasRight = marginVals.length > 0;
+  let leftMin = 0, leftMax = 1, rightMin = 0, rightMax = 100;
+  if (hasLeft) {
+    const minL = Math.min(...leftVals);
+    const maxL = Math.max(...leftVals);
+    const rangeL = maxL - minL || maxL * 0.15 || 10;
+    leftMin = Math.max(0, minL - rangeL * 0.12);
+    leftMax = maxL + rangeL * 0.12;
+  }
+  if (hasRight) {
+    const minR = Math.min(...marginVals);
+    const maxR = Math.max(...marginVals);
+    const rangeR = maxR - minR || 10;
+    rightMin = Math.max(0, minR - rangeR * 0.15);
+    rightMax = Math.min(100, maxR + rangeR * 0.15);
+    if (rightMax - rightMin < 5) { rightMin = Math.max(0, rightMin - 5); rightMax = Math.min(100, rightMax + 5); }
+  }
+  const leftSpan = leftMax - leftMin || 1;
+  const rightSpan = rightMax - rightMin || 1;
+  const toYLeft = v => pad.top + chartH - ((v - leftMin) / leftSpan) * chartH;
+  const toYRight = v => pad.top + chartH - ((v - rightMin) / rightSpan) * chartH;
+
   const yTicks = 4;
-  const yGrid = Array.from({ length: yTicks + 1 }, (_, i) => {
-    const val = yMin + (ySpan * i / yTicks);
-    const y = toY(val);
-    return `<line x1="${pad.left}" y1="${y.toFixed(1)}" x2="${w - pad.right}" y2="${y.toFixed(1)}" class="chart-grid-line"/>
-      <text x="${pad.left - 8}" y="${(y + 4).toFixed(1)}" class="chart-axis-label" text-anchor="end">${cur(val)}</text>`;
-  }).join('');
-  const xLabels = points.map(p => `
-    <text x="${p.x.toFixed(1)}" y="${h - 12}" class="chart-axis-label" text-anchor="middle">${formatChartDateShort(p.date)}</text>
+  let yGridLines = '', yLabelsLeft = '', yLabelsRight = '';
+  if (hasLeft) {
+    for (let i = 0; i <= yTicks; i++) {
+      const val = leftMin + (leftSpan * i / yTicks);
+      const y = toYLeft(val);
+      yGridLines += `<line x1="${pad.left}" y1="${y.toFixed(1)}" x2="${w - pad.right}" y2="${y.toFixed(1)}" class="chart-grid-line"/>`;
+      yLabelsLeft += `<text x="${pad.left - 8}" y="${(y + 4).toFixed(1)}" class="chart-axis-label" text-anchor="end">${cur(val)}</text>`;
+    }
+  } else if (hasRight) {
+    for (let i = 0; i <= yTicks; i++) {
+      const val = rightMin + (rightSpan * i / yTicks);
+      const y = toYRight(val);
+      yGridLines += `<line x1="${pad.left}" y1="${y.toFixed(1)}" x2="${w - pad.right}" y2="${y.toFixed(1)}" class="chart-grid-line"/>`;
+    }
+  }
+  if (hasRight) {
+    for (let i = 0; i <= yTicks; i++) {
+      const val = rightMin + (rightSpan * i / yTicks);
+      const y = toYRight(val);
+      yLabelsRight += `<text x="${w - pad.right + 8}" y="${(y + 4).toFixed(1)}" class="chart-axis-label chart-axis-label--right" text-anchor="start">${val.toFixed(0)}%</text>`;
+    }
+  }
+
+  const xLabels = sorted.map((p, i) => `
+    <text x="${toX(i).toFixed(1)}" y="${h - 12}" class="chart-axis-label" text-anchor="middle">${formatChartDateShort(p.date)}</text>
   `).join('');
-  const dots = points.map(p => `
-    <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" class="chart-dot" data-price="${p.price}">
-      <title>${formatChartDate(p.date)} — ${cur(p.price)}</title>
-    </circle>
-  `).join('');
-  const areaPath = n > 1
-    ? `${linePath} L${points[n - 1].x.toFixed(1)},${(pad.top + chartH).toFixed(1)} L${points[0].x.toFixed(1)},${(pad.top + chartH).toFixed(1)} Z`
-    : '';
+
+  function linePath(field, toY) {
+    const pts = sorted.map((p, i) => ({ x: toX(i), y: toY(p[field]) }));
+    if (pts.length === 1) return { path: '', dots: `<circle cx="${pts[0].x.toFixed(1)}" cy="${pts[0].y.toFixed(1)}" r="5" class="chart-dot chart-dot--${field}"><title>${formatChartDate(sorted[0].date)}</title></circle>` };
+    const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const dots = pts.map((p, i) => {
+      const pt = sorted[i];
+      const label = field === 'margin' ? `${pt.margin.toFixed(1)}%` : cur(pt[field]);
+      return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.5" class="chart-dot chart-dot--${field}"><title>${formatChartDate(pt.date)} — ${label}</title></circle>`;
+    }).join('');
+    return { path, dots };
+  }
+
+  let lines = '', dots = '';
+  if (series.sell && hasLeft) {
+    const s = linePath('price', toYLeft);
+    if (s.path) lines += `<path d="${s.path}" class="chart-line chart-line--sell"/>`;
+    dots += s.dots;
+  }
+  if (series.cost && hasLeft) {
+    const s = linePath('totalCost', toYLeft);
+    if (s.path) lines += `<path d="${s.path}" class="chart-line chart-line--cost"/>`;
+    dots += s.dots;
+  }
+  if (series.margin && hasRight) {
+    const s = linePath('margin', toYRight);
+    if (s.path) lines += `<path d="${s.path}" class="chart-line chart-line--margin"/>`;
+    dots += s.dots;
+  }
+
+  const latest = sorted[sorted.length - 1];
+  const toggleBtn = (key, label, cls) => {
+    const on = series[key];
+    return `<button type="button" class="chart-series-toggle ${on ? 'is-on' : ''}" onclick="toggleDashChartSeries('${key}')" aria-pressed="${on}">
+      <span class="chart-series-swatch chart-series-swatch--${cls}"></span>${label}
+    </button>`;
+  };
+
   el.innerHTML = `
     <div class="chart-summary">
       <span class="chart-summary-name">${recipeName}</span>
-      <span class="chart-summary-stat">${n} price change${n !== 1 ? 's' : ''} recorded</span>
-      <span class="chart-summary-current sell-price">${cur(sorted[sorted.length - 1].price)}</span>
+      <span class="chart-summary-stat">${n} snapshot${n !== 1 ? 's' : ''} recorded</span>
+      <div class="chart-summary-values">
+        ${series.sell ? `<span class="chart-summary-item"><span class="chart-summary-item-label">Sell</span><span class="chart-summary-item-val sell-price">${cur(latest.price)}</span></span>` : ''}
+        ${series.cost ? `<span class="chart-summary-item"><span class="chart-summary-item-label">Cost</span><span class="chart-summary-item-val chart-val--cost">${cur(latest.totalCost)}</span></span>` : ''}
+        ${series.margin ? `<span class="chart-summary-item"><span class="chart-summary-item-label">Margin</span><span class="chart-summary-item-val chart-val--margin">${latest.margin.toFixed(1)}%</span></span>` : ''}
+      </div>
+    </div>
+    <div class="chart-series-toggles">
+      ${toggleBtn('sell', 'Selling Price', 'sell')}
+      ${toggleBtn('cost', 'Total Cost', 'cost')}
+      ${toggleBtn('margin', 'Profit Margin', 'margin')}
     </div>
     <div class="chart-svg-wrap">
       <svg class="price-chart-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
-        ${yGrid}
+        ${yGridLines}
+        ${yLabelsLeft}
+        ${yLabelsRight}
         <line x1="${pad.left}" y1="${pad.top + chartH}" x2="${w - pad.right}" y2="${pad.top + chartH}" class="chart-axis-line"/>
         <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + chartH}" class="chart-axis-line"/>
-        ${areaPath ? `<path d="${areaPath}" class="chart-area"/>` : ''}
-        ${n > 1 ? `<path d="${linePath}" class="chart-line"/>` : ''}
+        ${hasRight ? `<line x1="${w - pad.right}" y1="${pad.top}" x2="${w - pad.right}" y2="${pad.top + chartH}" class="chart-axis-line chart-axis-line--right"/>` : ''}
+        ${lines}
         ${dots}
         ${xLabels}
       </svg>
-    </div>
-    <div class="chart-legend-row">
-      ${points.map(p => `<span class="chart-legend-pill"><span class="chart-legend-date">${formatChartDateShort(p.date)}</span> <span class="sell-price">${cur(p.price)}</span></span>`).join('')}
     </div>`;
 }
 function populateDashPriceChartDropdown() {
@@ -770,7 +895,7 @@ function renderDashPriceChart() {
   if (!el || !sel) return;
   const recipeId = sel.value;
   if (!recipeId) {
-    el.innerHTML = '<div class="chart-empty">Select a recipe from the dropdown to view its selling price history.</div>';
+    el.innerHTML = '<div class="chart-empty">Select a recipe from the dropdown to view its pricing history.</div>';
     return;
   }
   const recipe = db.recipes.find(r => r.id === recipeId);
@@ -780,15 +905,26 @@ function renderDashPriceChart() {
   }
   const history = recipe.priceHistory || [];
   if (!history.length) {
-    el.innerHTML = '<div class="chart-empty">No price history yet. Edit the recipe and save a selling price to start tracking.</div>';
+    el.innerHTML = '<div class="chart-empty">No history yet. Save a recipe with a selling price to start tracking price, cost, and margin.</div>';
     return;
   }
-  renderPriceLineChart(el, history, recipe.name);
+  renderPriceLineChart(el, history, recipe.name, dashChartSeries, recipe);
 }
 function checkAffectedRecipeMargins(ingredientName) {
   const tgt = db.settings.targetMargin || 30;
   const affected = db.recipes.filter(r => r.ingredients?.some(x => x.name === ingredientName));
   if (!affected.length) return;
+  let historyChanged = false;
+  affected.forEach(r => {
+    if (r.sellPrice > 0) {
+      const updated = appendRecipeHistorySnapshot(r.priceHistory || [], r);
+      if (updated.length !== (r.priceHistory || []).length) {
+        r.priceHistory = updated;
+        historyChanged = true;
+      }
+    }
+  });
+  if (historyChanged) save();
   const warnings = affected.map(r => ({ name: r.name, margin: calcMargin(r) })).filter(x => x.margin < tgt);
   if (!warnings.length) return;
   const detail = warnings.map(w => `${w.name} (${w.margin.toFixed(1)}%)`).join(', ');
@@ -1051,7 +1187,7 @@ async function saveRecipe() {
   if (existing?.sellPrice > 0 && Math.abs(sellPrice - existing.sellPrice) > 0.009) {
     lastSellPrice = existing.sellPrice;
   }
-  let priceHistory = appendPriceHistory(existing?.priceHistory || [], sellPrice);
+  let priceHistory = existing?.priceHistory || [];
   const recipe = {
     id: editingRecipeId || uid(),
     name, category: getRecipeCategory(),
@@ -1064,9 +1200,9 @@ async function saveRecipe() {
     pricingValue: pval,
     sellPrice,
     lastSellPrice,
-    priceHistory,
     priceLocked: true,
   };
+  recipe.priceHistory = appendRecipeHistorySnapshot(priceHistory, recipe);
   const isNew = !editingRecipeId;
   if (editingRecipeId) {
     const idx = db.recipes.findIndex(r => r.id === editingRecipeId);
