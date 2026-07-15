@@ -341,15 +341,62 @@ let viewingCnPackageId = null;
 let currentPkgImageData = null; // base64 image for current modal
 
 // ===== AUTHENTICATION & SESSION =====
-const SESSION_PASSWORD = 'fo.support';
+// Each account maps to its own Firestore document so data stays isolated.
+const ACCOUNTS = {
+  'fo.support': {
+    id: 'fo_support',
+    docId: 'db', // existing production data — do not rename
+    label: 'FO Support'
+  },
+  'marcellana123': {
+    id: 'marcellana',
+    docId: 'account_marcellana',
+    label: 'Marcellana'
+  }
+};
 const SESSION_DURATION = 10 * 60 * 60 * 1000;
 let sessionStartTime = null;
 let sessionTimer = null;
 let sessionAuthenticated = false;
+let currentAccount = null;
+
+function getAccountByPassword(password) {
+  return ACCOUNTS[password] || null;
+}
+
+function getAccountById(accountId) {
+  return Object.values(ACCOUNTS).find(a => a.id === accountId) || null;
+}
+
+function getAccountDocId() {
+  return currentAccount?.docId || 'db';
+}
+
+function emptyDb() {
+  return {
+    recipes: [],
+    ingredients: [],
+    packaging: [],
+    cnPackages: [],
+    settings: {
+      bizName: 'My Food Business',
+      currency: '₱',
+      markup: 30,
+      targetMargin: 30,
+      monthlyBatches: 100,
+      vat: 12,
+      pricingMethod: 'markup',
+      multiplier: 3,
+      theme: 'light'
+    }
+  };
+}
 
 function checkSessionValidity() {
   const storedTime = sessionStorage.getItem('sessionStartTime');
-  if (!storedTime) return false;
+  const storedAccount = sessionStorage.getItem('sessionAccountId');
+  if (!storedTime || !storedAccount) return false;
+  if (!getAccountById(storedAccount)) return false;
   const elapsed = Date.now() - parseInt(storedTime);
   return elapsed < SESSION_DURATION;
 }
@@ -357,6 +404,7 @@ function checkSessionValidity() {
 function initializeSession() {
   if (checkSessionValidity()) {
     sessionStartTime = parseInt(sessionStorage.getItem('sessionStartTime'));
+    currentAccount = getAccountById(sessionStorage.getItem('sessionAccountId'));
     sessionAuthenticated = true;
     showMainApp();
     startSessionTimer();
@@ -366,24 +414,29 @@ function initializeSession() {
 }
 
 function authenticateLogin() {
-  const password = document.getElementById('login-password').value;
-  if (password !== SESSION_PASSWORD) {
+  const password = document.getElementById('login-password').value.trim();
+  const account = getAccountByPassword(password);
+  if (!account) {
     toast('Invalid password', 'red');
     document.getElementById('login-password').value = '';
     return;
   }
+  currentAccount = account;
   sessionStartTime = Date.now();
   sessionStorage.setItem('sessionStartTime', sessionStartTime.toString());
+  sessionStorage.setItem('sessionAccountId', account.id);
   sessionAuthenticated = true;
   document.getElementById('login-password').value = '';
+  db = emptyDb(); // wipe previous account data from memory before loading
   showMainApp();
   startSessionTimer();
   (async () => {
     await load();
     refreshRecipeNameLists();
+    showPage('dashboard');
     renderDashboard();
     updateBadges();
-    toast('Welcome! Session started', 'green');
+    toast(`Welcome, ${account.label}! Session started`, 'green');
   })();
 }
 
@@ -396,7 +449,10 @@ function startSessionTimer() {
 
 function signOutSession() {
   sessionAuthenticated = false;
+  currentAccount = null;
+  db = emptyDb();
   sessionStorage.removeItem('sessionStartTime');
+  sessionStorage.removeItem('sessionAccountId');
   if (sessionTimer) clearInterval(sessionTimer);
   hideMainApp();
   document.getElementById('login-password').value = '';
@@ -432,8 +488,12 @@ const db_firestore = firebase.firestore();
 
 // ===== PERSISTENCE =====
 async function save() {
+  if (!currentAccount) {
+    console.warn('Save skipped — no account session');
+    return;
+  }
   try {
-    await db_firestore.collection('data').doc('db').set(db);
+    await db_firestore.collection('data').doc(getAccountDocId()).set(db);
     updateBadges();
   } catch (e) {
     console.error('Save failed', e);
@@ -441,10 +501,15 @@ async function save() {
   }
 }
 async function load() {
+  if (!currentAccount) {
+    db = emptyDb();
+    return;
+  }
   try {
-    const doc = await db_firestore.collection('data').doc('db').get();
+    const doc = await db_firestore.collection('data').doc(getAccountDocId()).get();
     if (doc.exists) { db = doc.data(); }
-  } catch (e) { console.error('Load failed', e); }
+    else { db = emptyDb(); }
+  } catch (e) { console.error('Load failed', e); db = emptyDb(); }
   if (!db.settings) db.settings = {};
   const def = { bizName: 'My Food Business', currency: '₱', markup: 30, targetMargin: 30, monthlyBatches: 100, vat: 12, pricingMethod: 'markup', multiplier: 3, theme: 'light' };
   for (const k in def) if (db.settings[k] === undefined) db.settings[k] = def[k];
