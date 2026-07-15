@@ -423,7 +423,8 @@
                 <tr>
                   <th>SKU / Ingredient</th>
                   <th>Category</th>
-                  <th>Unit</th>
+                  <th>Purchase Qty</th>
+                  <th>Total Cost</th>
                   <th>Cost / Unit</th>
                   <th>Supplier</th>
                   <th>Used In</th>
@@ -800,8 +801,16 @@
           <input type="text" id="ing-cat" placeholder="e.g. Dry Goods">
         </div>
         <div class="form-group">
+          <label>Supplier</label>
+          <input type="text" id="ing-supplier" placeholder="e.g. SM Supermarket">
+        </div>
+        <div class="form-group">
+          <label>Purchase Quantity *</label>
+          <input type="number" id="ing-qty" value="1" step="any" min="0" placeholder="e.g. 700" oninput="updateIngCostPreview()">
+        </div>
+        <div class="form-group">
           <label>Unit</label>
-          <select id="ing-unit">
+          <select id="ing-unit" onchange="updateIngCostPreview()">
             <option value="g">g</option><option value="kg">kg</option><option value="mg">mg</option>
             <option value="ml">mL</option><option value="l">L</option>
             <option value="oz">oz</option><option value="lb">lb</option>
@@ -813,14 +822,15 @@
           </select>
         </div>
         <div class="form-group">
-          <label>Cost per Unit (₱)</label>
-          <input type="number" id="ing-cost" value="0" step="0.01" min="0">
+          <label>Total Cost (₱) *</label>
+          <input type="number" id="ing-cost" value="0" step="0.01" min="0" placeholder="e.g. 670" oninput="updateIngCostPreview()">
         </div>
         <div class="form-group">
-          <label>Supplier</label>
-          <input type="text" id="ing-supplier" placeholder="e.g. SM Supermarket">
+          <label>Cost per Unit</label>
+          <div id="ing-cost-preview" style="font-size:13px;font-weight:700;color:var(--acc);padding:9px 0;font-family:'IBM Plex Mono',monospace">₱0.00 / g</div>
         </div>
       </div>
+      <div style="font-size:11px;color:var(--text4);margin-top:4px">Example: 700 mL milk for ₱670 → auto-calculates ₱0.957 / mL. No need to divide manually.</div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('ingredient-modal')">Cancel</button>

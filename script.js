@@ -76,8 +76,13 @@ function convertUnit(qty, fromUnit, toUnit) {
   const from = unitConversions[normalizeUnit(fromUnit)];
   const to = unitConversions[normalizeUnit(toUnit)];
   if (!from || !to) return qty;
-  if (from.base !== to.base) return qty;
-  return qty * (from.factor / to.factor);
+  // Same dimension (mass↔mass, volume↔volume, count↔count)
+  if (from.base === to.base) return qty * (from.factor / to.factor);
+  // Mass ↔ volume at density 1 (1 mL ≈ 1 g, 1 L ≈ 1000 g) — common for milk/water/liquids in recipes
+  if ((from.base === 'mass' && to.base === 'volume') || (from.base === 'volume' && to.base === 'mass')) {
+    return qty * (from.factor / to.factor);
+  }
+  return qty;
 }
 
 function calcIngredientCost(recipeQty, recipeUnit, ingName) {
@@ -1230,7 +1235,7 @@ async function saveRecipe() {
   const packaging = getRowData(document.getElementById('recipe-pkg-rows'), false);
   ingredients.forEach(ing => {
     if (ing.name && ing.costPerUnit > 0 && !db.ingredients.find(i => i.name === ing.name)) {
-      db.ingredients.push({ id: uid(), name: ing.name, category: 'Imported from Recipe', unit: ing.unit, costPerUnit: ing.costPerUnit, supplier: '' });
+      db.ingredients.push({ id: uid(), name: ing.name, category: 'Imported from Recipe', unit: ing.unit, purchaseQty: 1, purchaseCost: ing.costPerUnit, costPerUnit: ing.costPerUnit, supplier: '' });
     }
   });
   packaging.forEach(pkg => {
@@ -1350,8 +1355,12 @@ function renderViewRecipeModal() {
     ${(r.ingredients || []).map(i => {
       const ing = db.ingredients.find(x => x.name === i.name);
       const ingUnit = ing ? formatUnitLabel(ing.unit) : formatUnitLabel(i.unit);
-      return `<div class="view-ingredient-row"><span>${i.name} × ${i.qty} ${formatUnitLabel(i.unit)}</span><span class="td-mono">${cur(calcIngredientCost(i.qty, i.unit, i.name))}</span></div>
-      <div class="view-ingredient-sub" style="font-size:10px;color:var(--text4);padding:0 0 6px 0">Master: ${cur(ing?.costPerUnit || 0)} / ${ingUnit}</div>`;
+      const recipeUnit = formatUnitLabel(i.unit);
+      const converted = ing && normalizeUnit(i.unit) !== normalizeUnit(ing.unit)
+        ? ` · used ${i.qty} ${recipeUnit} ≈ ${Number(convertUnit(i.qty, i.unit, ing.unit).toFixed(4))} ${ingUnit}`
+        : '';
+      return `<div class="view-ingredient-row"><span>${i.name} × ${i.qty} ${recipeUnit}</span><span class="td-mono">${cur(calcIngredientCost(i.qty, i.unit, i.name))}</span></div>
+      <div class="view-ingredient-sub" style="font-size:10px;color:var(--text4);padding:0 0 6px 0">Master: ${cur(ing?.costPerUnit || 0)} / ${ingUnit}${converted}</div>`;
     }).join('')}
     <div class="section-divider">Packaging</div>
     ${(r.packaging || []).map(p => `<div class="view-ingredient-row"><span>${p.name} × ${p.qty} ${formatUnitLabel(p.unit)}</span><span class="td-mono">${cur(p.qty * p.costPerUnit)}</span></div>`).join('')}
@@ -1682,17 +1691,48 @@ function setDashPage(page) {
 }
 
 // ===== INGREDIENTS =====
+function calcIngCostPerUnit(purchaseQty, totalCost) {
+  const qty = parseFloat(purchaseQty) || 0;
+  const total = parseFloat(totalCost) || 0;
+  if (qty <= 0) return 0;
+  return total / qty;
+}
+function updateIngCostPreview() {
+  const qty = document.getElementById('ing-qty')?.value;
+  const total = document.getElementById('ing-cost')?.value;
+  const unit = formatUnitLabel(document.getElementById('ing-unit')?.value || 'g');
+  const preview = document.getElementById('ing-cost-preview');
+  if (!preview) return;
+  const perUnit = calcIngCostPerUnit(qty, total);
+  preview.textContent = `${cur(perUnit)} / ${unit}`;
+}
 function resetIngModal() {
   document.getElementById('ing-modal-title').textContent = 'Add Ingredient';
   ['ing-name', 'ing-sku', 'ing-cat', 'ing-supplier'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('ing-unit').value = 'g';
+  document.getElementById('ing-qty').value = 1;
   document.getElementById('ing-cost').value = 0;
+  updateIngCostPreview();
 }
 function saveIngredient() {
   const name = document.getElementById('ing-name').value.trim();
   if (!name) { toast('Name is required!', 'red'); return; }
-  const costPerUnit = parseFloat(document.getElementById('ing-cost').value) || 0;
-  const ing = { id: editingIngId || uid(), sku: document.getElementById('ing-sku').value.trim(), name, category: document.getElementById('ing-cat').value.trim(), unit: normalizeUnit(document.getElementById('ing-unit').value), costPerUnit, supplier: document.getElementById('ing-supplier').value.trim() };
+  const purchaseQty = parseFloat(document.getElementById('ing-qty').value) || 0;
+  const purchaseCost = parseFloat(document.getElementById('ing-cost').value) || 0;
+  if (purchaseQty <= 0) { toast('Purchase quantity must be greater than 0!', 'red'); return; }
+  const unit = normalizeUnit(document.getElementById('ing-unit').value);
+  const costPerUnit = calcIngCostPerUnit(purchaseQty, purchaseCost);
+  const ing = {
+    id: editingIngId || uid(),
+    sku: document.getElementById('ing-sku').value.trim(),
+    name,
+    category: document.getElementById('ing-cat').value.trim(),
+    unit,
+    purchaseQty,
+    purchaseCost,
+    costPerUnit,
+    supplier: document.getElementById('ing-supplier').value.trim()
+  };
   if (editingIngId) { const idx = db.ingredients.findIndex(i => i.id === editingIngId); if (idx >= 0) db.ingredients[idx] = ing; }
   else db.ingredients.push(ing);
   save(); closeModal('ingredient-modal'); renderIngredients(); renderIngCategoryFilter(); refreshRecipeNameLists(); renderRecipes(); renderDashboard();
@@ -1708,8 +1748,13 @@ function editIngredient(id) {
   document.getElementById('ing-sku').value = i.sku || '';
   document.getElementById('ing-cat').value = i.category || '';
   document.getElementById('ing-unit').value = normalizeUnit(i.unit) || 'g';
-  document.getElementById('ing-cost').value = i.costPerUnit || 0;
+  // Prefer stored purchase fields; fall back so older ingredients still edit cleanly
+  const qty = i.purchaseQty != null && i.purchaseQty > 0 ? i.purchaseQty : 1;
+  const total = i.purchaseCost != null ? i.purchaseCost : ((i.costPerUnit || 0) * qty);
+  document.getElementById('ing-qty').value = qty;
+  document.getElementById('ing-cost').value = total;
   document.getElementById('ing-supplier').value = i.supplier || '';
+  updateIngCostPreview();
   showModal('ingredient-modal');
 }
 function deleteIngredient(id) {
@@ -1724,17 +1769,22 @@ function renderIngredients() {
   let list = db.ingredients.filter(i => i.name.toLowerCase().includes(search) && (!cat || i.category === cat));
   const tbody = document.getElementById('ing-table-body');
   const paginationEl = document.getElementById('ing-pagination');
-  if (!list.length) { tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><h3>No ingredients yet</h3><p>Add ingredients to use them in recipes</p></div></td></tr>`; if (paginationEl) paginationEl.innerHTML = ''; return; }
+  if (!list.length) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><h3>No ingredients yet</h3><p>Add ingredients to use them in recipes</p></div></td></tr>`; if (paginationEl) paginationEl.innerHTML = ''; return; }
   const totalPages = Math.max(1, Math.ceil(list.length / ROWS_PER_PAGE));
   if (ingCurrentPage > totalPages) ingCurrentPage = totalPages;
   const pagedList = list.slice((ingCurrentPage - 1) * ROWS_PER_PAGE, ingCurrentPage * ROWS_PER_PAGE);
   tbody.innerHTML = pagedList.map(i => {
     const usedIn = db.recipes.filter(r => r.ingredients?.some(x => x.name === i.name)).length;
+    const qtyLabel = i.purchaseQty != null && i.purchaseQty > 0
+      ? `${i.purchaseQty} ${formatUnitLabel(i.unit)}`
+      : `1 ${formatUnitLabel(i.unit)}`;
+    const totalLabel = i.purchaseCost != null ? cur(i.purchaseCost) : cur(i.costPerUnit || 0);
     return `<tr>
       <td>${i.sku ? `${i.sku} — ` : ''}<span class="td-name">${i.name}</span></td>
       <td><span class="tag tag-purple">${i.category || '—'}</span></td>
-      <td>${formatUnitLabel(i.unit)}</td>
-      <td class="td-mono" style="color:var(--acc)">${cur(i.costPerUnit)}</td>
+      <td class="td-mono">${qtyLabel}</td>
+      <td class="td-mono">${totalLabel}</td>
+      <td class="td-mono" style="color:var(--acc)">${cur(i.costPerUnit)} / ${formatUnitLabel(i.unit)}</td>
       <td>${i.supplier || '—'}</td>
       <td><span class="tag ${usedIn ? 'tag-green' : 'tag-blue'}">${usedIn} recipe${usedIn !== 1 ? 's' : ''}</span></td>
       <td><div class="td-actions">
@@ -1934,15 +1984,36 @@ function handleIngredientUpload(e) {
       const normalizeKey = key => String(key || '').trim().toLowerCase();
       const rows = rawRows.map(raw => {
         const row = {}; Object.keys(raw).forEach(key => row[normalizeKey(key)] = raw[key]);
-        const unitCost = parseFloat(row['unit cost'] || row['unitcost'] || row['cost per unit'] || row['cost'] || 0) || 0;
         const unit = normalizeUnit(String(row['unit of measurement'] || row['unit'] || row['uom'] || 'pcs').trim() || 'pcs');
-        return { sku: String(row['sku'] || '').trim(), name: String(row['ingredient name'] || row['ingredient'] || row['name'] || '').trim(), unit, costPerUnit: unitCost, supplier: String(row['supplier'] || '').trim(), category: String(row['category'] || '').trim() };
+        const purchaseQty = parseFloat(row['purchase qty'] || row['quantity'] || row['qty'] || row['purchase quantity'] || 0) || 0;
+        const purchaseCost = parseFloat(row['total cost'] || row['purchase cost'] || row['package cost'] || row['price'] || 0) || 0;
+        const unitCostDirect = parseFloat(row['unit cost'] || row['unitcost'] || row['cost per unit'] || row['cost'] || 0) || 0;
+        let costPerUnit = 0, qty = 1, total = 0;
+        if (purchaseQty > 0 && purchaseCost > 0) {
+          qty = purchaseQty;
+          total = purchaseCost;
+          costPerUnit = purchaseCost / purchaseQty;
+        } else if (unitCostDirect > 0) {
+          qty = 1;
+          total = unitCostDirect;
+          costPerUnit = unitCostDirect;
+        }
+        return { sku: String(row['sku'] || '').trim(), name: String(row['ingredient name'] || row['ingredient'] || row['name'] || '').trim(), unit, purchaseQty: qty, purchaseCost: total, costPerUnit, supplier: String(row['supplier'] || '').trim(), category: String(row['category'] || '').trim() };
       }).filter(item => item.name);
       if (!rows.length) { toast('No valid ingredient rows found.', 'red'); return; }
       let added = 0, updated = 0;
       rows.forEach(item => {
         const existing = db.ingredients.find(i => i.name.toLowerCase() === item.name.toLowerCase());
-        if (existing) { Object.assign(existing, { sku: existing.sku || item.sku, category: existing.category || item.category, supplier: existing.supplier || item.supplier, unit: item.unit || existing.unit || 'pcs', ...(item.costPerUnit ? { costPerUnit: item.costPerUnit } : {}) }); updated++; }
+        if (existing) {
+          Object.assign(existing, {
+            sku: existing.sku || item.sku,
+            category: existing.category || item.category,
+            supplier: existing.supplier || item.supplier,
+            unit: item.unit || existing.unit || 'pcs',
+            ...(item.costPerUnit ? { costPerUnit: item.costPerUnit, purchaseQty: item.purchaseQty, purchaseCost: item.purchaseCost } : {})
+          });
+          updated++;
+        }
         else { db.ingredients.push({ id: uid(), ...item }); added++; }
       });
       save(); renderIngredients(); renderIngCategoryFilter(); refreshRecipeNameLists(); updateBadges();
